@@ -1,12 +1,32 @@
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { ListScreen } from './src/screens/ListScreen';
+import { DetailScreen } from './src/screens/DetailScreen';
+import { CollectionPoint } from './src/types/types';
 
 export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<'list' | 'detail'>('list');
+  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
+
+  const handleSelectPoint = (point: CollectionPoint) => {
+    setSelectedPoint(point);
+    setCurrentScreen('detail');
+  };
+
+  const handleBackToList = () => {
+    setCurrentScreen('list');
+    setSelectedPoint(null);
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mão Amiga</Text>
-      <Text style={styles.subtitle}>
-        Sistema de coleta e distribuição de alimentos
-      </Text>
+      {currentScreen === 'list' ? (
+        <ListScreen onSelectPoint={handleSelectPoint} />
+      ) : (
+        selectedPoint && (
+          <DetailScreen point={selectedPoint} onBack={handleBackToList} />
+        )
+      )}
     </View>
   );
 }
@@ -14,17 +34,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
+    backgroundColor: '#F8FAFC',
   },
 });
