@@ -40,6 +40,10 @@ export const theme = {
     xl: 20,
     round: 9999,
   },
+  layout: {
+    contentWidth: '92%' as const,
+    contentMaxWidth: 680,
+  },
   shadows: {
     light: {
       shadowColor: '#0F172A',

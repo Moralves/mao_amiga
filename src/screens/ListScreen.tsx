@@ -6,9 +6,9 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { mockCollectionPoints, categories } from '../data/mockPoints';
 import { PointCard } from '../components/PointCard';
 import { CollectionPoint } from '../types/types';
@@ -120,6 +120,7 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint }) => {
         <FlatList
           data={filteredPoints}
           keyExtractor={(item) => item.id}
+          style={styles.pointsList}
           renderItem={({ item }) => (
             <PointCard point={item} onPress={() => onSelectPoint(item)} />
           )}
@@ -158,9 +159,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
   },
   header: {
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
@@ -176,6 +179,8 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   searchContainer: {
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.cardBg,
@@ -204,11 +209,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   categoriesWrapper: {
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
     marginBottom: theme.spacing.lg,
-    marginHorizontal: -theme.spacing.lg, // pull lists full-width
   },
   categoriesList: {
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xs,
   },
   categoryPill: {
     paddingHorizontal: theme.spacing.lg,
@@ -232,7 +238,14 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
   listContent: {
+    width: '100%',
     paddingBottom: theme.spacing.xxl,
+  },
+  pointsList: {
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
+    flex: 1,
+    minWidth: 0,
   },
   emptyContainer: {
     alignItems: 'center',

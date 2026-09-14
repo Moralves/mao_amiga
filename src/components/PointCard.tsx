@@ -56,7 +56,7 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
       ]}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title}>
           {point.name}
         </Text>
         <View style={[styles.badge, { backgroundColor: catStyle.bg }]}>
@@ -66,7 +66,7 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
         </View>
       </View>
 
-      <Text style={styles.description} numberOfLines={2}>
+      <Text style={styles.description}>
         {point.shortDescription}
       </Text>
 
@@ -83,6 +83,7 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
+    width: '100%',
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.lg,
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: theme.spacing.sm,
   },
   title: {
@@ -107,9 +108,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.textMain,
     flex: 1,
+    flexShrink: 1,
     marginRight: theme.spacing.sm,
   },
   badge: {
+    flexShrink: 1,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.round,
@@ -119,6 +122,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '600',
+    textAlign: 'right',
   },
   description: {
     fontSize: 14,
@@ -149,8 +153,10 @@ const styles = StyleSheet.create({
     color: theme.colors.textMain,
   },
   arrowIcon: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '600',
     color: theme.colors.primaryDark,
+    textAlign: 'right',
   },
 });

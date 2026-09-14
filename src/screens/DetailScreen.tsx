@@ -5,11 +5,11 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Linking,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CollectionPoint } from '../types/types';
 import { theme } from '../styles/theme';
 
@@ -168,7 +168,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scrollContent: {
-    padding: theme.spacing.lg,
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingVertical: theme.spacing.lg,
     paddingBottom: theme.spacing.xxxl,
   },
   titleSection: {
