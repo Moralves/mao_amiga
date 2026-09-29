@@ -4,6 +4,8 @@
 O projeto Mão Amiga é um sistema desenvolvido para gerenciar a arrecadação, o controle de estoque e a distribuição de alimentos em pontos de coleta. O objetivo principal é garantir que as doações cheguem de forma justa e organizada a quem precisa, otimizando a logística de entrada e saída de mantimentos.
 
 ## Funcionalidades Principais
+
+No aplicativo, selecione um ponto de coleta, toque em **Cadastrar doação neste ponto** e informe o tipo e a quantidade do item. Após salvar, a página **Itens cadastrados** mostra os itens daquele ponto. Para consultá-los depois de reabrir o aplicativo, acesse o mesmo ponto e toque em **Ver itens cadastrados neste ponto**. Os registros ficam no AsyncStorage do dispositivo; não são sincronizados com um servidor.
 - Arrecadação de Alimentos: Registro da entrada de mantimentos recebidos por meio de doações.
 - Controle de Estoque: Gerenciamento transparente da quantidade de alimentos disponíveis, monitorando de perto o fluxo de entradas e saídas.
 - Distribuição Organizada: Controle do processo de entrega de alimentos aos beneficiários cadastrados.
