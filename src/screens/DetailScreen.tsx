@@ -16,9 +16,10 @@ import { theme } from '../styles/theme';
 interface DetailScreenProps {
   point: CollectionPoint;
   onBack: () => void;
+  onOpenDonation: () => void;
 }
 
-export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack }) => {
+export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpenDonation }) => {
   const handleCall = () => {
     const cleanPhone = point.phone.replace(/[^0-9]/g, '');
     Linking.openURL(`tel:${cleanPhone}`).catch(() => {
@@ -113,10 +114,19 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack }) => 
         <View style={styles.actionContainer}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={handleRoute}
+            onPress={onOpenDonation}
             style={styles.primaryButton}
+            accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>Como Chegar (Mapas)</Text>
+            <Text style={styles.primaryButtonText}>Cadastrar doação neste ponto</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleRoute}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Como Chegar (Mapas)</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
