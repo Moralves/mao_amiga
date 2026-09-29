@@ -10,3 +10,11 @@ export interface CollectionPoint {
   rating: number; // Star rating (1-5)
   acceptedMaterials: string[]; // List of materials accepted (e.g. ["Baterias", "Celulares", "Notebooks"])
 }
+
+export interface DonationItem {
+  id: string;
+  pointId: string;
+  itemType: string;
+  quantity: number;
+  createdAt: string;
+}

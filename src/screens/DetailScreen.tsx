@@ -17,9 +17,10 @@ interface DetailScreenProps {
   point: CollectionPoint;
   onBack: () => void;
   onOpenDonation: () => void;
+  onOpenPointItems: () => void;
 }
 
-export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpenDonation }) => {
+export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpenDonation, onOpenPointItems }) => {
   const handleCall = () => {
     const cleanPhone = point.phone.replace(/[^0-9]/g, '');
     Linking.openURL(`tel:${cleanPhone}`).catch(() => {
@@ -112,6 +113,14 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpe
 
         {/* Action Buttons */}
         <View style={styles.actionContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onOpenPointItems}
+            style={styles.secondaryButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.secondaryButtonText}>Ver itens cadastrados neste ponto</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onOpenDonation}

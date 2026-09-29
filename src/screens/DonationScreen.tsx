@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -11,30 +11,26 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { CollectionPoint } from '../types/types';
+import { saveDonation } from '../data/donations';
 
 interface DonationScreenProps {
   point: CollectionPoint;
   onBack: () => void;
+  onSaved: () => void;
 }
 
-export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack }) => {
-  const insets = useSafeAreaInsets();
+export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack, onSaved }) => {
   const [itemType, setItemType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [errors, setErrors] = useState({ itemType: '', quantity: '' });
-  const [validated, setValidated] = useState(false);
-
-  useEffect(() => {
-    if (!validated) return;
-    const timeout = setTimeout(() => setValidated(false), 3000);
-    return () => clearTimeout(timeout);
-  }, [validated]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleQuantityChange = (value: string) => {
-    setValidated(false);
+    setSaveError('');
     if (value !== '' && !/^[0-9]+$/.test(value)) {
       setErrors((current) => ({ ...current, quantity: 'Digite apenas números na quantidade.' }));
       return;
@@ -44,15 +40,27 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack })
     setErrors((current) => ({ ...current, quantity: '' }));
   };
 
-  const handleValidate = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const nextErrors = {
       itemType: itemType.trim() ? '' : 'Informe o tipo do item.',
       quantity: !quantity ? 'Informe a quantidade.' : Number(quantity) <= 0 ? 'Informe uma quantidade maior que zero.' : '',
     };
     const isValid = !Object.values(nextErrors).some(Boolean);
     setErrors(nextErrors);
-    setValidated(isValid);
-    if (isValid) Keyboard.dismiss();
+    if (!isValid) return;
+
+    Keyboard.dismiss();
+    setSaveError('');
+    setSaving(true);
+    try {
+      await saveDonation(point.id, itemType, Number(quantity));
+      onSaved();
+    } catch {
+      setSaveError('Não foi possível salvar a doação neste dispositivo. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -83,7 +91,7 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack })
             value={itemType}
             onChangeText={(value) => {
               setItemType(value);
-              setValidated(false);
+              setSaveError('');
               if (errors.itemType) setErrors((current) => ({ ...current, itemType: '' }));
             }}
             placeholder="Ex.: alimentos não perecíveis"
@@ -116,23 +124,13 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack })
           </View>
         </View>
 
-        <Pressable style={styles.validateButton} onPress={handleValidate} accessibilityRole="button">
-          <Text style={styles.validateButtonText}>Validar formulário</Text>
+        {!!saveError && <Text style={styles.errorText} accessibilityRole="alert">{saveError}</Text>}
+        <Pressable style={styles.validateButton} onPress={handleSave} disabled={saving} accessibilityRole="button" accessibilityState={{ disabled: saving }}>
+          <Text style={styles.validateButtonText}>{saving ? 'Salvando...' : 'Salvar doação'}</Text>
         </Pressable>
       </ScrollView>
       </KeyboardAvoidingView>
       </SafeAreaView>
-      {validated && (
-        <View
-          style={[styles.toastPosition, { top: insets.top + theme.spacing.md }]}
-          pointerEvents="none"
-        >
-          <View style={styles.successToast} accessibilityRole="alert" accessibilityLiveRegion="polite">
-            <Text style={styles.successToastIcon}>✓</Text>
-            <Text style={styles.successToastText}>Dados validados com sucesso!</Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 };
@@ -183,22 +181,4 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg,
   },
   validateButtonText: { color: theme.colors.white, fontSize: 16, fontWeight: '700' },
-  toastPosition: {
-    position: 'absolute', left: theme.spacing.md, right: theme.spacing.md,
-    alignItems: 'center', zIndex: 10, elevation: 10,
-  },
-  successToast: {
-    width: '100%', maxWidth: theme.layout.contentMaxWidth,
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: theme.colors.primaryText, borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg,
-    ...theme.shadows.medium,
-  },
-  successToastIcon: {
-    color: theme.colors.white, fontSize: 18, fontWeight: '700', marginRight: theme.spacing.md,
-  },
-  successToastText: {
-    flex: 1, flexShrink: 1, color: theme.colors.white,
-    fontSize: 15, fontWeight: '700', lineHeight: 21,
-  },
 });
