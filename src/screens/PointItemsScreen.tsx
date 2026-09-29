@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getDonations } from '../data/donations';
+import { listarDoacoes } from '../data/doacoesStorage';
 import { theme } from '../styles/theme';
 import { CollectionPoint, DonationItem } from '../types/types';
 
@@ -21,9 +21,9 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({ point, onBac
     let active = true;
     setLoading(true);
     setError(false);
-    getDonations(point.id)
+    listarDoacoes()
       .then((saved) => {
-        if (active) setItems(saved);
+        if (active) setItems(saved.filter((item) => item.pointId === point.id).reverse());
       })
       .catch(() => {
         if (active) setError(true);
@@ -64,7 +64,7 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({ point, onBac
               <View style={styles.itemCard}>
                 <Text style={styles.itemTitle}>{item.itemType}</Text>
                 <Text style={styles.itemDetail}>Quantidade: {item.quantity}</Text>
-                <Text style={styles.itemDate}>Cadastrado em {new Date(item.createdAt).toLocaleDateString('pt-BR')}</Text>
+                <Text style={styles.itemDate}>Cadastrado em {new Date(item.criadoEm).toLocaleString('pt-BR')}</Text>
               </View>
             )}
             ListEmptyComponent={
