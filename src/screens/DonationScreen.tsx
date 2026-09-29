@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { CollectionPoint } from '../types/types';
-import { saveDonation } from '../data/donations';
+import { salvarDoacao } from '../data/doacoesStorage';
 
 interface DonationScreenProps {
   point: CollectionPoint;
@@ -54,7 +54,7 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({ point, onBack, o
     setSaveError('');
     setSaving(true);
     try {
-      await saveDonation(point.id, itemType, Number(quantity));
+      await salvarDoacao({ pointId: point.id, itemType, quantity: Number(quantity) });
       onSaved();
     } catch {
       setSaveError('Não foi possível salvar a doação neste dispositivo. Tente novamente.');
