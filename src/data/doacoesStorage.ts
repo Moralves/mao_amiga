@@ -82,3 +82,35 @@ export function excluirDoacao(id: string): Promise<void> {
   return exclusao;
 }
 
+/**
+ * Atualiza os dados de uma doação existente no AsyncStorage.
+ * Utiliza a mesma fila sequencial (filaDeSalvamento) para evitar condições de corrida.
+ * 
+ * @param doacaoAtualizada Doação contendo os dados modificados (mesmo id)
+ */
+export function atualizarDoacao(doacaoAtualizada: DonationItem): Promise<DonationItem> {
+  const atualizacao = filaDeSalvamento.then(async () => {
+    const doacoes = await listarDoacoes();
+    const indice = doacoes.findIndex((d) => d.id === doacaoAtualizada.id);
+    if (indice === -1) {
+      throw new Error(`Doação com id ${doacaoAtualizada.id} não encontrada para atualização.`);
+    }
+    const novasDoacoes = [...doacoes];
+    novasDoacoes[indice] = {
+      ...doacaoAtualizada,
+      itemType: doacaoAtualizada.itemType.trim(),
+    };
+    await AsyncStorage.setItem(CHAVE_DOACOES, JSON.stringify(novasDoacoes));
+    return novasDoacoes[indice];
+  });
+
+  filaDeSalvamento = atualizacao.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return atualizacao;
+}
+
+export const editarDoacao = atualizarDoacao;
+
