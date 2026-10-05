@@ -20,11 +20,18 @@ import { DonationItem } from '../types/types';
 interface MyDonationsScreenProps {
   onBack: () => void;
   onGoToCadastro: () => void;
+  onSelectDonation?: (donation: DonationItem) => void;
+  navigation?: {
+    navigate?: (screen: string, params?: unknown) => void;
+    addListener?: (event: string, callback: () => void) => () => void;
+  };
 }
 
 export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
   onBack,
   onGoToCadastro,
+  onSelectDonation,
+  navigation,
 }) => {
   const [donations, setDonations] = useState<DonationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +56,19 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
 
   useEffect(() => {
     carregarDoacoes();
-  }, [carregarDoacoes]);
+
+    // Se utilizado com React Navigation, atualiza ao receber foco
+    if (navigation?.addListener) {
+      const unsubscribe = navigation.addListener('focus', carregarDoacoes);
+      return unsubscribe;
+    }
+  }, [carregarDoacoes, navigation]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     carregarDoacoes();
   };
+
 
   const getPointName = (pointId: string): string => {
     const point = mockCollectionPoints.find((p) => p.id === pointId);
@@ -115,7 +129,17 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
             data={donations}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <DonationCard item={item} pointName={getPointName(item.pointId)} />
+              <DonationCard
+                item={item}
+                pointName={getPointName(item.pointId)}
+                onPress={() => {
+                  if (onSelectDonation) {
+                    onSelectDonation(item);
+                  } else if (navigation?.navigate) {
+                    navigation.navigate('DonationDetail', { donation: item });
+                  }
+                }}
+              />
             )}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}

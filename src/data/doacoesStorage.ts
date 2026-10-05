@@ -56,3 +56,29 @@ export function salvarDoacao(doacao: NovaDoacao): Promise<DonationItem> {
   filaDeSalvamento = salvamento.then(() => undefined, () => undefined);
   return salvamento;
 }
+
+/**
+ * Remove uma doação do AsyncStorage a partir do seu identificador único (id).
+ * Utiliza a mesma fila sequencial (filaDeSalvamento) para evitar condições de corrida (race conditions).
+ * 
+ * @param id Identificador da doação que deve ser excluída
+ */
+export function excluirDoacao(id: string): Promise<void> {
+  const exclusao = filaDeSalvamento.then(async () => {
+    // 1. Carrega todas as doações atuais do AsyncStorage
+    const doacoes = await listarDoacoes();
+    // 2. Filtra a lista removendo o item com o id especificado
+    const doacoesFiltradas = doacoes.filter((salva) => salva.id !== id);
+    // 3. Persiste a lista atualizada de volta no AsyncStorage
+    await AsyncStorage.setItem(CHAVE_DOACOES, JSON.stringify(doacoesFiltradas));
+  });
+
+  // Atualiza a fila para garantir que próximas operações aguardem esta exclusão
+  filaDeSalvamento = exclusao.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return exclusao;
+}
+

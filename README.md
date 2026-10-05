@@ -9,7 +9,9 @@ No aplicativo, selecione um ponto de coleta, toque em **Cadastrar doação neste
 
 Para visualizar o histórico geral de contribuições, utilize o botão **Minhas doações** disponível no topo da tela inicial. A tela lista todas as doações salvas, detalhando tipo do item, quantidade, ponto de destino e data do registro, contando com atualização dinâmica após novos cadastros e estado vazio com atalho para doação.
 
-O arquivo `src/data/doacoesStorage.ts` concentra a leitura e a gravação. `salvarDoacao(doacao)` acrescenta um registro com `id` e `criadoEm`; `listarDoacoes()` recupera o histórico completo. A página de cada ponto filtra esse histórico pelo identificador do ponto, enquanto a tela **Minhas doações** exibe a listagem completa das doações.
+Ao tocar em qualquer doação da lista, é exibida a tela de detalhes com todos os campos da doação e a data formatada de forma legível. A partir dessa tela, é possível excluir doações cadastradas por engano: o botão de exclusão solicita confirmação via `Alert.alert` (com as opções *Cancelar* e *Excluir*). A opção *Cancelar* mantém o registro intacto, enquanto a confirmação aciona a função `excluirDoacao(id)`, removendo o item do `AsyncStorage` e retornando ao histórico atualizado sem fechar o aplicativo.
+
+O arquivo `src/data/doacoesStorage.ts` concentra a leitura, gravação e exclusão. `salvarDoacao(doacao)` acrescenta um registro com `id` e `criadoEm`; `listarDoacoes()` recupera o histórico completo; e `excluirDoacao(id)` remove um registro específico. A página de cada ponto filtra esse histórico pelo identificador do ponto, enquanto a tela **Minhas doações** exibe a listagem completa das doações.
 
 - Arrecadação de Alimentos: Registro da entrada de mantimentos recebidos por meio de doações.
 - Controle de Estoque: Gerenciamento transparente da quantidade de alimentos disponíveis, monitorando de perto o fluxo de entradas e saídas.

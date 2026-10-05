@@ -5,14 +5,18 @@ import { DetailScreen } from './src/screens/DetailScreen';
 import { DonationScreen } from './src/screens/DonationScreen';
 import { PointItemsScreen } from './src/screens/PointItemsScreen';
 import { MyDonationsScreen } from './src/screens/MyDonationsScreen';
-import { CollectionPoint } from './src/types/types';
-import { mockCollectionPoints } from './src/data/mockPoints';
+import { DonationDetailScreen } from './src/screens/DonationDetailScreen';
+import { CollectionPoint, DonationItem } from './src/types/types';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'list' | 'detail' | 'donation' | 'pointItems' | 'myDonations'>('list');
+  const [currentScreen, setCurrentScreen] = useState<
+    'list' | 'detail' | 'donation' | 'pointItems' | 'myDonations' | 'donationDetail'
+  >('list');
   const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
+  const [selectedDonation, setSelectedDonation] = useState<DonationItem | null>(null);
   const [donationReturnScreen, setDonationReturnScreen] = useState<'detail' | 'pointItems' | 'myDonations'>('detail');
+  const [donationDetailReturnScreen, setDonationDetailReturnScreen] = useState<'myDonations' | 'pointItems'>('myDonations');
 
   const handleSelectPoint = (point: CollectionPoint) => {
     setSelectedPoint(point);
@@ -63,6 +67,32 @@ export default function App() {
     }
   };
 
+  // Abre os detalhes da doação a partir do histórico
+  const handleOpenDonationDetailFromHistory = (donation: DonationItem) => {
+    setSelectedDonation(donation);
+    setDonationDetailReturnScreen('myDonations');
+    setCurrentScreen('donationDetail');
+  };
+
+  // Abre os detalhes da doação a partir dos itens do ponto
+  const handleOpenDonationDetailFromPointItems = (donation: DonationItem) => {
+    setSelectedDonation(donation);
+    setDonationDetailReturnScreen('pointItems');
+    setCurrentScreen('donationDetail');
+  };
+
+  // Retorno manual a partir do detalhe da doação
+  const handleBackFromDonationDetail = () => {
+    setCurrentScreen(donationDetailReturnScreen);
+    setSelectedDonation(null);
+  };
+
+  // Retorno após exclusão com sucesso da doação
+  const handleDonationDeleted = () => {
+    setCurrentScreen(donationDetailReturnScreen);
+    setSelectedDonation(null);
+  };
+
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
@@ -75,6 +105,20 @@ export default function App() {
           <MyDonationsScreen
             onBack={handleBackFromMyDonations}
             onGoToCadastro={handleOpenCadastroFromMyDonations}
+            onSelectDonation={handleOpenDonationDetailFromHistory}
+          />
+        ) : currentScreen === 'donationDetail' ? (
+          <DonationDetailScreen
+            route={{
+              params: {
+                donation: selectedDonation ?? undefined,
+                doacao: selectedDonation ?? undefined,
+                ...(selectedDonation || {}),
+              },
+            }}
+            donation={selectedDonation ?? undefined}
+            onBack={handleBackFromDonationDetail}
+            onDeleteSuccess={handleDonationDeleted}
           />
         ) : currentScreen === 'donation' ? (
           <DonationScreen
@@ -89,6 +133,7 @@ export default function App() {
               point={selectedPoint}
               onBack={handleBackFromPointItems}
               onOpenDonation={handleOpenDonation}
+              onSelectDonation={handleOpenDonationDetailFromPointItems}
             />
           )
         ) : (

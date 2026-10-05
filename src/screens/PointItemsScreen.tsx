@@ -9,9 +9,15 @@ interface PointItemsScreenProps {
   point: CollectionPoint;
   onBack: () => void;
   onOpenDonation: () => void;
+  onSelectDonation?: (donation: DonationItem) => void;
 }
 
-export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({ point, onBack, onOpenDonation }) => {
+export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({
+  point,
+  onBack,
+  onOpenDonation,
+  onSelectDonation,
+}) => {
   const [items, setItems] = useState<DonationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -61,11 +67,23 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({ point, onBac
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-              <View style={styles.itemCard}>
+              <Pressable
+                onPress={() => onSelectDonation?.(item)}
+                accessibilityRole={onSelectDonation ? 'button' : undefined}
+                style={({ pressed }) => [
+                  styles.itemCard,
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
                 <Text style={styles.itemTitle}>{item.itemType}</Text>
                 <Text style={styles.itemDetail}>Quantidade: {item.quantity}</Text>
                 <Text style={styles.itemDate}>Cadastrado em {new Date(item.criadoEm).toLocaleString('pt-BR')}</Text>
-              </View>
+                {onSelectDonation && (
+                  <Text style={{ fontSize: 12, color: theme.colors.primaryDark, marginTop: 6, fontWeight: '600' }}>
+                    Toque para ver detalhes ou excluir →
+                  </Text>
+                )}
+              </Pressable>
             )}
             ListEmptyComponent={
               <View style={styles.messageBox}>
