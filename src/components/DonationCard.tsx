@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DonationItem } from '../types/types';
 import { mockCollectionPoints } from '../data/mockPoints';
 import { theme } from '../styles/theme';
@@ -8,6 +8,7 @@ export interface DonationCardProps {
   item?: DonationItem;
   donation?: DonationItem;
   pointName?: string;
+  onPress?: () => void;
 }
 
 const formatDate = (isoString: string): string => {
@@ -24,6 +25,7 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
   item,
   donation,
   pointName,
+  onPress,
 }) {
   const data = item ?? donation;
   if (!data) return null;
@@ -36,7 +38,15 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
   const formattedDate = formatDate(data.criadoEm);
 
   return (
-    <View style={styles.card} testID={`donation-card-${data.id}`}>
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.7 : 1}
+      onPress={onPress}
+      disabled={!onPress}
+      style={styles.card}
+      testID={`donation-card-${data.id}`}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? `Ver detalhes da doação de ${data.itemType}` : undefined}
+    >
       <View style={styles.headerRow}>
         <Text style={styles.itemTitle}>{data.itemType}</Text>
         <View style={styles.quantityBadge}>
@@ -65,9 +75,16 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
         <Text style={styles.infoLabel}>Data:</Text>
         <Text style={styles.infoValue}>{formattedDate}</Text>
       </View>
-    </View>
+
+      {onPress && (
+        <View style={styles.footerRow}>
+          <Text style={styles.footerActionText}>Toque para ver detalhes ou excluir →</Text>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 });
+
 
 const styles = StyleSheet.create({
   card: {
@@ -122,6 +139,18 @@ const styles = StyleSheet.create({
     color: theme.colors.textMain,
     flex: 1,
     fontWeight: '500',
+  },
+  footerRow: {
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    alignItems: 'flex-end',
+  },
+  footerActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primaryDark,
   },
 });
 
