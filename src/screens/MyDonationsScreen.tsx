@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { listarDoacoes } from '../data/doacoesStorage';
 import { mockCollectionPoints } from '../data/mockPoints';
 import { DonationCard } from '../components/DonationCard';
+import { DonationSummary } from '../components/DonationSummary';
 import { theme } from '../styles/theme';
 import { DonationItem } from '../types/types';
 
@@ -149,6 +150,9 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
             </View>
           ) : (
             <>
+              {/* Resumo com total de doações e quantidade somada por tipo de item */}
+              <DonationSummary donations={donations} />
+
               {/* Campo de busca no topo do histórico */}
               <View style={styles.searchContainer}>
                 <Text style={styles.searchIcon}>🔍</Text>
