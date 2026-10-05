@@ -16,9 +16,10 @@ import { theme } from '../styles/theme';
 
 interface ListScreenProps {
   onSelectPoint: (point: CollectionPoint) => void;
+  onOpenMyDonations: () => void;
 }
 
-export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint }) => {
+export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyDonations }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
 
@@ -78,8 +79,21 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint }) => {
       <View style={styles.container}>
         {/* App Header */}
         <View style={styles.header}>
-          <Text style={styles.logoTitle}>Mão Amiga</Text>
-          <Text style={styles.logoSubtitle}>Encontre pontos de descarte e coleta seletiva</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitles}>
+              <Text style={styles.logoTitle}>Mão Amiga</Text>
+              <Text style={styles.logoSubtitle}>Encontre pontos de descarte e coleta seletiva</Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onOpenMyDonations}
+              style={styles.myDonationsButton}
+              accessibilityRole="button"
+              accessibilityLabel="Minhas doações"
+            >
+              <Text style={styles.myDonationsButtonText}>Minhas doações</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search Filter input */}
@@ -167,6 +181,17 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  headerTitles: {
+    flex: 1,
+    minWidth: 180,
+  },
   logoTitle: {
     fontSize: 28,
     fontWeight: '800',
@@ -177,6 +202,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.xs,
+  },
+  myDonationsButton: {
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.round,
+    borderWidth: 1,
+    borderColor: theme.colors.primaryDark,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 38,
+  },
+  myDonationsButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.primaryDark,
   },
   searchContainer: {
     width: theme.layout.contentWidth,
