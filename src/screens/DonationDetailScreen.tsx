@@ -286,18 +286,10 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
             </View>
 
             {/* Campo 6: Data do Registro formatada de forma legível */}
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, styles.lastRow]}>
               <Text style={styles.detailLabel}>Data e horário:</Text>
               <Text style={styles.detailValue} testID="donation-field-date">
                 {dataFormatada}
-              </Text>
-            </View>
-
-            {/* Campo 7: Identificador Único do Registro */}
-            <View style={[styles.detailRow, styles.lastRow]}>
-              <Text style={styles.detailLabel}>Código do registro:</Text>
-              <Text style={styles.detailCodeValue} testID="donation-field-id">
-                {donation.id}
               </Text>
             </View>
           </View>
@@ -466,16 +458,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMain,
     flex: 1,
   },
-  detailCodeValue: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    color: theme.colors.textSecondary,
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
+
   actionsContainer: {
     gap: theme.spacing.md,
   },
