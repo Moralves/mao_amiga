@@ -302,14 +302,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
             </View>
           </View>
 
-          {/* Card Informativo */}
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeIcon}>ℹ️</Text>
-            <Text style={styles.noticeText}>
-              Este registro está salvo localmente na memória do aplicativo. Caso tenha sido
-              cadastrado por engano, você pode excluí-lo permanentemente abaixo.
-            </Text>
-          </View>
 
           {/* Área de Ações: Botão Excluir */}
           <View style={styles.actionsContainer}>
@@ -483,27 +475,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-  },
-  noticeCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
-    alignItems: 'flex-start',
-  },
-  noticeIcon: {
-    fontSize: 18,
-    marginRight: theme.spacing.sm,
-    marginTop: 1,
-  },
-  noticeText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#1E40AF',
-    flex: 1,
   },
   actionsContainer: {
     gap: theme.spacing.md,
