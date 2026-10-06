@@ -20,6 +20,7 @@ import { DonationCard } from '../components/DonationCard';
 import { DonationSummary } from '../components/DonationSummary';
 import { theme } from '../styles/theme';
 import { DonationItem } from '../types/types';
+import { obterFiltroMinhasDoacoes, salvarFiltroMinhasDoacoes } from '../data/rascunhosStorage';
 
 interface MyDonationsScreenProps {
   onBack: () => void;
@@ -42,6 +43,29 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterLoaded, setFilterLoaded] = useState(false);
+
+  // Carrega busca salva do histórico de doações ao abrir a tela
+  useEffect(() => {
+    let isMounted = true;
+    obterFiltroMinhasDoacoes().then((filtro) => {
+      if (!isMounted) return;
+      if (filtro && typeof filtro.searchQuery === 'string') {
+        setSearchQuery(filtro.searchQuery);
+      }
+      setFilterLoaded(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Salva busca em andamento automaticamente
+  useEffect(() => {
+    if (!filterLoaded) return;
+    salvarFiltroMinhasDoacoes({ searchQuery });
+  }, [searchQuery, filterLoaded]);
 
   const carregarDoacoes = useCallback(async () => {
     try {

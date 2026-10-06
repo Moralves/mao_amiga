@@ -19,6 +19,11 @@ import { theme } from '../styles/theme';
 import { CollectionPoint } from '../types/types';
 import { mockCollectionPoints } from '../data/mockPoints';
 import { salvarDoacao } from '../data/doacoesStorage';
+import {
+  limparRascunhoDoacao,
+  obterRascunhoDoacao,
+  salvarRascunhoDoacao,
+} from '../data/rascunhosStorage';
 
 interface DonationScreenProps {
   point?: CollectionPoint | null;
@@ -40,12 +45,69 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
+  // 1. Carrega rascunho em andamento ao abrir a tela
+  useEffect(() => {
+    let isMounted = true;
+    obterRascunhoDoacao().then((rascunho) => {
+      if (!isMounted) return;
+      if (rascunho) {
+        let restaurado = false;
+        if (rascunho.itemType) {
+          setItemType(rascunho.itemType);
+          restaurado = true;
+        }
+        if (rascunho.quantity) {
+          setQuantity(rascunho.quantity);
+          restaurado = true;
+        }
+        if (rascunho.pointId && !initialPoint) {
+          const pontoSalvo = mockCollectionPoints.find((p) => p.id === rascunho.pointId);
+          if (pontoSalvo) {
+            setSelectedPoint(pontoSalvo);
+            restaurado = true;
+          }
+        }
+        if (restaurado) {
+          setHasRestoredDraft(true);
+        }
+      }
+      setDraftLoaded(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialPoint]);
+
+  // Atualiza ponto selecionado se initialPoint mudar externamente
   useEffect(() => {
     if (initialPoint) {
       setSelectedPoint(initialPoint);
     }
   }, [initialPoint]);
+
+  // 2. Persiste rascunho automaticamente a cada alteração após o carregamento inicial
+  useEffect(() => {
+    if (!draftLoaded) return;
+    salvarRascunhoDoacao({
+      itemType,
+      quantity,
+      pointId: selectedPoint?.id ?? null,
+    });
+  }, [itemType, quantity, selectedPoint, draftLoaded]);
+
+  const handleDiscardDraft = async () => {
+    setItemType('');
+    setQuantity('');
+    if (!initialPoint) setSelectedPoint(null);
+    setHasRestoredDraft(false);
+    setErrors({ itemType: '', quantity: '', point: '' });
+    setSaveError('');
+    await limparRascunhoDoacao();
+  };
 
   const handleQuantityChange = (value: string) => {
     setSaveError('');
@@ -93,6 +155,8 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setSaving(true);
     try {
       await salvarDoacao({ pointId: selectedPoint.id, itemType, quantity: Number(quantity) });
+      // Limpa rascunho após salvar doação finalizada com sucesso
+      await limparRascunhoDoacao();
       onSaved();
     } catch {
       setSaveError('Não foi possível salvar a doação neste dispositivo. Tente novamente.');
@@ -123,6 +187,20 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
             <Text style={styles.subtitle}>
               Preencha os dados do item e confirme o ponto de coleta de destino.
             </Text>
+
+            {hasRestoredDraft && (
+              <View style={styles.draftBanner}>
+                <Text style={styles.draftBannerText}>📝 Rascunho não finalizado restaurado</Text>
+                <TouchableOpacity
+                  onPress={handleDiscardDraft}
+                  style={styles.discardButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Descartar rascunho em andamento"
+                >
+                  <Text style={styles.discardButtonText}>Descartar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={styles.formCard}>
               <Text style={styles.label}>Tipo do item</Text>
@@ -546,6 +624,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: theme.colors.primaryDark,
+  },
+  draftBanner: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  draftBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+    flex: 1,
+  },
+  discardButton: {
+    backgroundColor: '#FDE68A',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  discardButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#78350F',
   },
 });
 

@@ -18,3 +18,20 @@ export interface DonationItem {
   quantity: number;
   criadoEm: string;
 }
+
+export interface RascunhoDoacao {
+  pointId?: string | null;
+  itemType?: string;
+  quantity?: string;
+  atualizadoEm?: string;
+}
+
+export interface FiltroPontosDraft {
+  searchQuery: string;
+  selectedCategory: string;
+}
+
+export interface FiltroMinhasDoacoesDraft {
+  searchQuery: string;
+}
+

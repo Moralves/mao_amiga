@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,6 +13,7 @@ import { mockCollectionPoints, categories } from '../data/mockPoints';
 import { PointCard } from '../components/PointCard';
 import { CollectionPoint } from '../types/types';
 import { theme } from '../styles/theme';
+import { obterFiltroPontos, salvarFiltroPontos } from '../data/rascunhosStorage';
 
 interface ListScreenProps {
   onSelectPoint: (point: CollectionPoint) => void;
@@ -22,6 +23,30 @@ interface ListScreenProps {
 export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyDonations }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [filterLoaded, setFilterLoaded] = useState(false);
+
+  // Carrega busca e categoria salvas ao abrir a tela
+  useEffect(() => {
+    let isMounted = true;
+    obterFiltroPontos().then((filtro) => {
+      if (!isMounted) return;
+      if (filtro) {
+        if (typeof filtro.searchQuery === 'string') setSearchQuery(filtro.searchQuery);
+        if (typeof filtro.selectedCategory === 'string') setSelectedCategory(filtro.selectedCategory);
+      }
+      setFilterLoaded(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Salva alterações nos filtros automaticamente
+  useEffect(() => {
+    if (!filterLoaded) return;
+    salvarFiltroPontos({ searchQuery, selectedCategory });
+  }, [searchQuery, selectedCategory, filterLoaded]);
 
   // Filter logic: simple, efficient, and responsive
   const filteredPoints = useMemo(() => {
