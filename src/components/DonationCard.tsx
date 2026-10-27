@@ -1,12 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { DonationItem } from '../types/types';
-import { mockCollectionPoints } from '../data/mockPoints';
+import { Doacao } from '../types/doacao';
 import { theme } from '../styles/theme';
 
 export interface DonationCardProps {
-  item?: DonationItem;
-  donation?: DonationItem;
+  item?: Doacao;
+  donation?: Doacao;
   pointName?: string;
   onPress?: () => void;
 }
@@ -30,11 +29,7 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
   const data = item ?? donation;
   if (!data) return null;
 
-  const destinationName =
-    pointName ||
-    mockCollectionPoints.find((point) => point.id === data.pointId)?.name ||
-    'Ponto de coleta';
-
+  const destinationName = pointName || data.pontoDestino || 'Ponto de coleta';
   const formattedDate = formatDate(data.criadoEm);
 
   return (
@@ -45,25 +40,25 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
       style={styles.card}
       testID={`donation-card-${data.id}`}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={onPress ? `Ver detalhes da doação de ${data.itemType}` : undefined}
+      accessibilityLabel={onPress ? `Ver detalhes da doação de ${data.tipoItem}` : undefined}
     >
       <View style={styles.headerRow}>
-        <Text style={styles.itemTitle}>{data.itemType}</Text>
+        <Text style={styles.itemTitle}>{data.tipoItem}</Text>
         <View style={styles.quantityBadge}>
           <Text style={styles.quantityBadgeText}>
-            {data.quantity} {data.quantity === 1 ? 'item' : 'itens'}
+            {data.quantidade} {data.quantidade === 1 ? 'item' : 'itens'}
           </Text>
         </View>
       </View>
 
       <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>Tipo:</Text>
-        <Text style={styles.infoValue}>{data.itemType}</Text>
+        <Text style={styles.infoValue}>{data.tipoItem}</Text>
       </View>
 
       <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>Quantidade:</Text>
-        <Text style={styles.infoValue}>{data.quantity}</Text>
+        <Text style={styles.infoValue}>{data.quantidade}</Text>
       </View>
 
       <View style={styles.infoRow}>
@@ -84,7 +79,6 @@ export const DonationCard = React.memo<DonationCardProps>(function DonationCard(
     </TouchableOpacity>
   );
 });
-
 
 const styles = StyleSheet.create({
   card: {
@@ -156,4 +150,3 @@ const styles = StyleSheet.create({
 
 export const DonationItemCard = DonationCard;
 export default DonationCard;
-

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -15,25 +16,37 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+import { Ponto } from '../types/ponto';
+import { listarPontos } from '../services/pontosService';
+import { salvarDoacao } from '../services/doacoesStorage';
 import { theme } from '../styles/theme';
-import { CollectionPoint } from '../types/types';
-import { mockCollectionPoints } from '../data/mockPoints';
-import { salvarDoacao } from '../data/doacoesStorage';
 
-interface DonationScreenProps {
-  point?: CollectionPoint | null;
-  onBack: () => void;
-  onSaved: () => void;
-  onSelectPoint?: (point: CollectionPoint) => void;
+export interface DonationScreenCustomProps {
+  point?: Ponto | null;
+  onBack?: () => void;
+  onSaved?: () => void;
+  onSelectPoint?: (point: Ponto) => void;
 }
 
+export type DonationScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'Donation'>> &
+  DonationScreenCustomProps;
+
 export const DonationScreen: React.FC<DonationScreenProps> = ({
+  route,
+  navigation,
   point: initialPoint,
   onBack,
   onSaved,
   onSelectPoint,
 }) => {
-  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(initialPoint ?? null);
+  const pontoInicial = route?.params?.ponto ?? initialPoint ?? null;
+  const [selectedPoint, setSelectedPoint] = useState<Ponto | null>(pontoInicial);
+  const [availablePoints, setAvailablePoints] = useState<Ponto[]>([]);
+  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [pointsError, setPointsError] = useState<string | null>(null);
+
   const [itemType, setItemType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [errors, setErrors] = useState({ itemType: '', quantity: '', point: '' });
@@ -42,10 +55,36 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    if (initialPoint) {
-      setSelectedPoint(initialPoint);
+    if (pontoInicial) {
+      setSelectedPoint(pontoInicial);
     }
-  }, [initialPoint]);
+  }, [pontoInicial]);
+
+  // Carrega pontos da API para a seleção de destino
+  const carregarPontosApi = useCallback(async () => {
+    setLoadingPoints(true);
+    setPointsError(null);
+    try {
+      const response = await listarPontos({ size: 50 });
+      setAvailablePoints(response.content || []);
+    } catch {
+      setPointsError('Não foi possível obter a lista de pontos da API.');
+    } finally {
+      setLoadingPoints(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarPontosApi();
+  }, [carregarPontosApi]);
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (navigation?.goBack) {
+      navigation.goBack();
+    }
+  };
 
   const handleQuantityChange = (value: string) => {
     setSaveError('');
@@ -58,7 +97,7 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setErrors((current) => ({ ...current, quantity: '' }));
   };
 
-  const handleSelectPointItem = (item: CollectionPoint) => {
+  const handleSelectPointItem = (item: Ponto) => {
     setSelectedPoint(item);
     onSelectPoint?.(item);
     setErrors((current) => ({ ...current, point: '' }));
@@ -92,8 +131,30 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setSaveError('');
     setSaving(true);
     try {
-      await salvarDoacao({ pointId: selectedPoint.id, itemType, quantity: Number(quantity) });
-      onSaved();
+      await salvarDoacao({
+        tipoItem: itemType.trim(),
+        quantidade: Number(quantity),
+        pontoDestino: selectedPoint.nome,
+      });
+
+      if (onSaved) {
+        onSaved();
+      } else if (navigation?.navigate) {
+        const returnScreen = route?.params?.returnScreen;
+        if (returnScreen === 'MyDonations') {
+          navigation.navigate('MyDonations');
+        } else if (returnScreen === 'PointItems') {
+          navigation.navigate('PointItems', {
+            pontoId: selectedPoint.id,
+            pontoNome: selectedPoint.nome,
+          });
+        } else {
+          navigation.navigate('PointItems', {
+            pontoId: selectedPoint.id,
+            pontoNome: selectedPoint.nome,
+          });
+        }
+      }
     } catch {
       setSaveError('Não foi possível salvar a doação neste dispositivo. Tente novamente.');
     } finally {
@@ -105,9 +166,12 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     <View style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
       <SafeAreaView style={styles.screenContent}>
-        <KeyboardAvoidingView style={styles.screenContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.screenContent}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.header}>
-            <Pressable onPress={onBack} accessibilityRole="button" style={styles.backButton}>
+            <Pressable onPress={handleBack} accessibilityRole="button" style={styles.backButton}>
               <Text style={styles.backText}>← Voltar</Text>
             </Pressable>
             <Text style={styles.headerTitle}>Nova doação</Text>
@@ -119,88 +183,82 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            <Text style={styles.title}>Cadastrar doação</Text>
+            <Text style={styles.title}>Registrar Doação</Text>
             <Text style={styles.subtitle}>
-              Preencha os dados do item e confirme o ponto de coleta de destino.
+              Preencha os dados abaixo para registrar os mantimentos entregues:
             </Text>
 
-            <View style={styles.formCard}>
-              <Text style={styles.label}>Tipo do item</Text>
-              <TextInput
-                style={[styles.input, !!errors.itemType && styles.inputError]}
-                value={itemType}
-                onChangeText={(value) => {
-                  setItemType(value);
-                  setSaveError('');
-                  if (errors.itemType) setErrors((current) => ({ ...current, itemType: '' }));
-                }}
-                placeholder="Ex.: alimentos não perecíveis"
-                placeholderTextColor={theme.colors.textMuted}
-                accessibilityLabel="Tipo do item"
-                autoCapitalize="sentences"
-              />
-              {!!errors.itemType && <Text style={styles.errorText}>{errors.itemType}</Text>}
-
-              <Text style={styles.label}>Quantidade</Text>
-              <TextInput
-                style={[styles.input, !!errors.quantity && styles.inputError]}
-                value={quantity}
-                onChangeText={handleQuantityChange}
-                placeholder="Ex.: 10"
-                placeholderTextColor={theme.colors.textMuted}
-                accessibilityLabel="Quantidade"
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={9}
-              />
-              {!!errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
-
-              <Text style={styles.label}>Ponto de destino</Text>
-              {selectedPoint ? (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setModalVisible(true)}
-                  style={[styles.pointOption, !!errors.point && styles.inputError]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Ponto de destino: ${selectedPoint.name}, ${selectedPoint.address}`}
-                >
-                  <View style={styles.pointText}>
-                    <View style={styles.pointHeaderRow}>
-                      <Text style={styles.pointName}>{selectedPoint.name}</Text>
-                      <View style={styles.changeBadge}>
-                        <Text style={styles.changeBadgeText}>Trocar ponto ▾</Text>
+            {/* Ponto de destino selector */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Ponto de Destino *</Text>
+              <Pressable
+                onPress={() => setModalVisible(true)}
+                style={[styles.pointSelectorButton, !!errors.point && styles.inputError]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  selectedPoint
+                    ? `Ponto selecionado: ${selectedPoint.nome}. Toque para alterar.`
+                    : 'Toque para escolher o ponto de destino da doação.'
+                }
+              >
+                {selectedPoint ? (
+                  <View style={styles.selectedPointContent}>
+                    <View style={styles.selectedPointHeader}>
+                      <Text style={styles.selectedPointName}>{selectedPoint.nome}</Text>
+                      <View style={styles.selectedPointBadge}>
+                        <Text style={styles.selectedPointBadgeText}>{selectedPoint.tipo}</Text>
                       </View>
                     </View>
-                    <Text style={styles.pointAddress}>{selectedPoint.address}</Text>
-                    <View style={styles.pointCategoryTag}>
-                      <Text style={styles.pointCategoryTagText}>{selectedPoint.category}</Text>
-                    </View>
+                    <Text style={styles.selectedPointAddress}>📍 {selectedPoint.endereco}</Text>
+                    <Text style={styles.changePointText}>Toque para alterar o ponto</Text>
                   </View>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setModalVisible(true)}
-                  style={[styles.pointSelectorEmpty, !!errors.point && styles.inputError]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Selecionar ponto de destino"
-                >
-                  <View style={styles.pointSelectorEmptyContent}>
-                    <Text style={styles.pointSelectorIcon}>📍</Text>
-                    <View style={styles.pointSelectorTextWrapper}>
-                      <Text style={styles.pointSelectorEmptyTitle}>Selecione o ponto de destino</Text>
-                      <Text style={styles.pointSelectorEmptySubtitle}>
-                        Toque para escolher entre os pontos de coleta disponíveis
-                      </Text>
-                    </View>
-                    <Text style={styles.pointSelectorAction}>Escolher ▾</Text>
+                ) : (
+                  <View style={styles.placeholderRow}>
+                    <Text style={styles.selectorPlaceholder}>Selecione o ponto de destino...</Text>
+                    <Text style={styles.selectorChevron}>▼</Text>
                   </View>
-                </TouchableOpacity>
-              )}
+                )}
+              </Pressable>
               {!!errors.point && <Text style={styles.errorText}>{errors.point}</Text>}
             </View>
 
-            {!!saveError && <Text style={styles.errorText} accessibilityRole="alert">{saveError}</Text>}
+            {/* Tipo do Item */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Tipo do Item *</Text>
+              <TextInput
+                style={[styles.input, !!errors.itemType && styles.inputError]}
+                placeholder="Ex: Cesta Básica, Arroz, Feijão, Agasalho"
+                placeholderTextColor={theme.colors.textMuted}
+                value={itemType}
+                onChangeText={(text) => {
+                  setItemType(text);
+                  setErrors((current) => ({ ...current, itemType: '' }));
+                  setSaveError('');
+                }}
+              />
+              {!!errors.itemType && <Text style={styles.errorText}>{errors.itemType}</Text>}
+            </View>
+
+            {/* Quantidade */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Quantidade (unidades) *</Text>
+              <TextInput
+                style={[styles.input, !!errors.quantity && styles.inputError]}
+                placeholder="Ex: 5"
+                placeholderTextColor={theme.colors.textMuted}
+                value={quantity}
+                onChangeText={handleQuantityChange}
+                keyboardType="numeric"
+              />
+              {!!errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
+            </View>
+
+            {!!saveError && (
+              <Text style={styles.errorText} accessibilityRole="alert">
+                {saveError}
+              </Text>
+            )}
+
             <Pressable
               style={styles.validateButton}
               onPress={handleSave}
@@ -208,13 +266,15 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               accessibilityRole="button"
               accessibilityState={{ disabled: saving }}
             >
-              <Text style={styles.validateButtonText}>{saving ? 'Salvando...' : 'Salvar doação'}</Text>
+              <Text style={styles.validateButtonText}>
+                {saving ? 'Salvando...' : 'Salvar doação'}
+              </Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Modal for selecting any collection point */}
+      {/* Modal para seleção dos pontos vindos da API */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -227,7 +287,7 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               <View style={styles.modalHeaderTextWrapper}>
                 <Text style={styles.modalTitle}>Escolha o ponto de destino</Text>
                 <Text style={styles.modalSubtitle}>
-                  Selecione para qual ponto a sua doação será destinada:
+                  Selecione um ponto de coleta da API:
                 </Text>
               </View>
               <TouchableOpacity
@@ -240,45 +300,71 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            <FlatList
-              data={mockCollectionPoints}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.modalListContent}
-              renderItem={({ item }) => {
-                const isSelected = selectedPoint?.id === item.id;
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => handleSelectPointItem(item)}
-                    style={[
-                      styles.modalPointCard,
-                      isSelected && styles.modalPointCardSelected,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Selecionar ${item.name}`}
-                  >
-                    <View style={styles.modalPointHeader}>
-                      <Text style={[styles.modalPointTitle, isSelected && styles.modalPointTitleSelected]}>
-                        {item.name}
-                      </Text>
-                      <View style={[styles.modalBadge, isSelected && styles.modalBadgeSelected]}>
-                        <Text style={[styles.modalBadgeText, isSelected && styles.modalBadgeTextSelected]}>
-                          {item.category}
+            {loadingPoints ? (
+              <View style={styles.modalLoadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primaryDark} />
+                <Text style={styles.modalLoadingText}>Carregando pontos da API...</Text>
+              </View>
+            ) : pointsError ? (
+              <View style={styles.modalLoadingContainer}>
+                <Text style={styles.errorText}>{pointsError}</Text>
+                <TouchableOpacity style={styles.modalRetryButton} onPress={carregarPontosApi}>
+                  <Text style={styles.modalRetryButtonText}>Recarregar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={availablePoints}
+                keyExtractor={(item) => String(item.id)}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalListContent}
+                renderItem={({ item }) => {
+                  const isSelected = selectedPoint?.id === item.id;
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleSelectPointItem(item)}
+                      style={[
+                        styles.modalPointCard,
+                        isSelected && styles.modalPointCardSelected,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Selecionar ${item.nome}`}
+                    >
+                      <View style={styles.modalPointHeader}>
+                        <Text
+                          style={[
+                            styles.modalPointTitle,
+                            isSelected && styles.modalPointTitleSelected,
+                          ]}
+                        >
+                          {item.nome}
                         </Text>
+                        <View
+                          style={[styles.modalBadge, isSelected && styles.modalBadgeSelected]}
+                        >
+                          <Text
+                            style={[
+                              styles.modalBadgeText,
+                              isSelected && styles.modalBadgeTextSelected,
+                            ]}
+                          >
+                            {item.tipo}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                    <Text style={styles.modalPointAddress}>📍 {item.address}</Text>
-                    <Text style={styles.modalPointHours}>⏰ {item.hours}</Text>
-                    {isSelected && (
-                      <View style={styles.selectedBanner}>
-                        <Text style={styles.selectedBannerText}>✓ Ponto selecionado</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
+                      <Text style={styles.modalPointAddress}>📍 {item.endereco}</Text>
+                      <Text style={styles.modalPointHours}>⏰ {item.horarioFuncionamento}</Text>
+                      {isSelected && (
+                        <View style={styles.selectedBanner}>
+                          <Text style={styles.selectedBannerText}>✓ Ponto selecionado</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -298,166 +384,157 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
   },
-  backButton: { minHeight: 44, justifyContent: 'center', paddingRight: theme.spacing.lg },
-  backText: { color: theme.colors.primaryDark, fontWeight: '700', fontSize: 15 },
-  headerTitle: { flexShrink: 1, color: theme.colors.textMain, fontWeight: '700', fontSize: 16 },
+  backButton: {
+    marginRight: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+  },
+  backText: {
+    fontSize: 16,
+    color: theme.colors.primaryDark,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.textMain,
+  },
   scrollView: { flex: 1 },
   scrollContent: {
-    width: theme.layout.contentWidth,
-    maxWidth: theme.layout.contentMaxWidth,
-    alignSelf: 'center',
-    paddingVertical: theme.spacing.xl,
-    paddingBottom: theme.spacing.xxxl,
+    padding: theme.spacing.lg,
   },
-  title: { fontSize: 26, fontWeight: '800', color: theme.colors.textMain, marginBottom: theme.spacing.xs },
-  subtitle: { fontSize: 15, color: theme.colors.textSecondary, marginBottom: theme.spacing.xl, lineHeight: 21 },
-  formCard: {
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: theme.colors.textMain,
+    marginBottom: theme.spacing.xs,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
+    lineHeight: 20,
+  },
+  fieldContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+    marginBottom: theme.spacing.xs,
+  },
+  input: {
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-    ...theme.shadows.light,
-  },
-  label: { fontSize: 15, fontWeight: '700', color: theme.colors.textMain, marginBottom: theme.spacing.sm },
-  input: {
-    minHeight: 50,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 12,
     fontSize: 15,
     color: theme.colors.textMain,
-    marginBottom: theme.spacing.lg,
   },
-  inputError: { borderColor: theme.colors.error, marginBottom: theme.spacing.xs },
-  errorText: { color: theme.colors.error, fontSize: 13, marginBottom: theme.spacing.lg },
-  pointOption: {
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  pointSelectorButton: {
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.primaryDark,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: '#F8FAFC',
+    borderColor: theme.colors.border,
     padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
   },
-  pointText: { flex: 1 },
-  pointHeaderRow: {
+  placeholderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    paddingVertical: 4,
   },
-  pointName: { fontSize: 15, fontWeight: '700', color: theme.colors.textMain, flex: 1, marginRight: theme.spacing.sm },
-  changeBadge: {
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.round,
-  },
-  changeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.primaryDark,
-  },
-  pointAddress: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
-  pointCategoryTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.sm,
-    marginTop: theme.spacing.xs,
-  },
-  pointCategoryTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primaryText,
-  },
-  pointSelectorEmpty: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.primaryDark,
-    borderStyle: 'dashed',
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: '#F0FDF4',
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  pointSelectorEmptyContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pointSelectorIcon: {
-    fontSize: 24,
-    marginRight: theme.spacing.md,
-  },
-  pointSelectorTextWrapper: {
-    flex: 1,
-  },
-  pointSelectorEmptyTitle: {
+  selectorPlaceholder: {
     fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.primaryDark,
+    color: theme.colors.textMuted,
   },
-  pointSelectorEmptySubtitle: {
+  selectorChevron: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-    marginTop: 2,
   },
-  pointSelectorAction: {
-    fontSize: 13,
+  selectedPointContent: {
+    gap: 4,
+  },
+  selectedPointHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedPointName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textMain,
+    flex: 1,
+    marginRight: 8,
+  },
+  selectedPointBadge: {
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  selectedPointBadgeText: {
+    fontSize: 11,
     fontWeight: '700',
     color: theme.colors.primaryDark,
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 5,
-    borderRadius: theme.borderRadius.round,
-    overflow: 'hidden',
+  },
+  selectedPointAddress: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  changePointText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primaryDark,
+    marginTop: 4,
   },
   validateButton: {
     backgroundColor: theme.colors.primaryDark,
+    paddingVertical: 15,
     borderRadius: theme.borderRadius.md,
-    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
   },
-  validateButtonText: { color: theme.colors.white, fontSize: 16, fontWeight: '700' },
-
-  /* Modal Styles */
+  validateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContainer: {
     backgroundColor: theme.colors.cardBg,
-    borderRadius: theme.borderRadius.lg,
-    width: '100%',
-    maxWidth: 560,
-    maxHeight: '85%',
+    borderTopLeftRadius: theme.borderRadius.lg,
+    borderTopRightRadius: theme.borderRadius.lg,
+    maxHeight: '80%',
     padding: theme.spacing.lg,
-    ...theme.shadows.dark,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    paddingBottom: theme.spacing.sm,
   },
   modalHeaderTextWrapper: {
     flex: 1,
-    paddingRight: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
   modalTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '800',
     color: theme.colors.textMain,
   },
@@ -468,28 +545,47 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     padding: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
   },
   modalCloseText: {
-    fontSize: 20,
-    color: theme.colors.textMuted,
+    fontSize: 18,
+    color: theme.colors.textSecondary,
+    fontWeight: 'bold',
+  },
+  modalLoadingContainer: {
+    padding: theme.spacing.xxl,
+    alignItems: 'center',
+  },
+  modalLoadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  modalRetryButton: {
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.primaryDark,
+    borderRadius: theme.borderRadius.sm,
+  },
+  modalRetryButtonText: {
+    color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 13,
   },
   modalListContent: {
-    paddingVertical: theme.spacing.xs,
+    paddingBottom: theme.spacing.xl,
   },
   modalPointCard: {
     backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   modalPointCardSelected: {
     borderColor: theme.colors.primaryDark,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 2,
+    backgroundColor: theme.colors.primaryLight,
   },
   modalPointHeader: {
     flexDirection: 'row',
@@ -498,34 +594,30 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modalPointTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: theme.colors.textMain,
     flex: 1,
-    marginRight: theme.spacing.sm,
   },
   modalPointTitleSelected: {
     color: theme.colors.primaryDark,
   },
   modalBadge: {
-    backgroundColor: theme.colors.cardBg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
   },
   modalBadgeSelected: {
-    backgroundColor: theme.colors.primaryLight,
-    borderColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.primaryDark,
   },
   modalBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: theme.colors.textSecondary,
   },
   modalBadgeTextSelected: {
-    color: theme.colors.primaryDark,
+    color: '#FFFFFF',
   },
   modalPointAddress: {
     fontSize: 13,
@@ -537,10 +629,10 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   selectedBanner: {
-    marginTop: theme.spacing.xs,
-    paddingTop: theme.spacing.xs,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#DCFCE7',
+    borderTopColor: theme.colors.primaryDark,
   },
   selectedBannerText: {
     fontSize: 12,
@@ -548,5 +640,3 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
   },
 });
-
-export default DonationScreen;

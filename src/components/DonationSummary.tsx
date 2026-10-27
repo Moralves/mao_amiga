@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView } from 'react-native';
-import { DonationItem } from '../types/types';
+import { Doacao } from '../types/doacao';
 import { theme } from '../styles/theme';
 
 export interface ItemTypeSummary {
@@ -17,7 +17,7 @@ export interface DonationsSummaryData {
 }
 
 export interface DonationSummaryProps {
-  donations: DonationItem[];
+  donations: Doacao[];
 }
 
 /**
@@ -49,7 +49,7 @@ export function formatarResumoItem(itemType: string, totalQuantity: number, coun
  * - Insensível a diferenças de caixa (ex: "roupa" e "Roupa" agrupam juntos).
  * - Suporta array vazio sem quebrar a tela.
  */
-export function calcularResumoDoacoes(donations: DonationItem[]): DonationsSummaryData {
+export function calcularResumoDoacoes(donations: Doacao[]): DonationsSummaryData {
   if (!Array.isArray(donations) || donations.length === 0) {
     return {
       totalDonations: 0,
@@ -63,14 +63,14 @@ export function calcularResumoDoacoes(donations: DonationItem[]): DonationsSumma
   const map = new Map<string, { displayName: string; totalQuantity: number; count: number }>();
 
   for (const donation of donations) {
-    const rawType = donation?.itemType?.trim() || 'Outros';
+    const rawType = donation?.tipoItem?.trim() || 'Outros';
     const key = rawType.toLowerCase();
     const displayName = formatarNomeTipo(rawType);
 
     const numQty =
-      typeof donation?.quantity === 'number'
-        ? donation.quantity
-        : parseInt(String(donation?.quantity), 10);
+      typeof donation?.quantidade === 'number'
+        ? donation.quantidade
+        : parseInt(String(donation?.quantidade), 10);
     const qty = !isNaN(numQty) && numQty > 0 ? numQty : 0;
 
     totalQuantity += qty;

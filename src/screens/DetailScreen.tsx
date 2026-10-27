@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,64 +8,198 @@ import {
   StatusBar,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CollectionPoint } from '../types/types';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+import { Ponto } from '../types/ponto';
+import { buscarPontoPorId } from '../services/pontosService';
 import { theme } from '../styles/theme';
 
-interface DetailScreenProps {
-  point: CollectionPoint;
-  onBack: () => void;
-  onOpenDonation: () => void;
-  onOpenPointItems: () => void;
+export interface DetailScreenCustomProps {
+  point?: Ponto | null;
+  onBack?: () => void;
+  onOpenDonation?: () => void;
+  onOpenPointItems?: () => void;
 }
 
-export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpenDonation, onOpenPointItems }) => {
+export type DetailScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'Detail'>> &
+  DetailScreenCustomProps;
+
+export const DetailScreen: React.FC<DetailScreenProps> = ({
+  route,
+  navigation,
+  point: initialPoint,
+  onBack,
+  onOpenDonation,
+  onOpenPointItems,
+}) => {
+  const pontoId = route?.params?.pontoId ?? initialPoint?.id;
+  const [point, setPoint] = useState<Ponto | null>(
+    route?.params?.ponto || initialPoint || null
+  );
+  const [loading, setLoading] = useState<boolean>(!point && !!pontoId);
+  const [notFound, setNotFound] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const carregarPonto = useCallback(async () => {
+    if (!pontoId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setNotFound(false);
+    setErrorMessage(null);
+    try {
+      const data = await buscarPontoPorId(pontoId);
+      if (!data) {
+        setNotFound(true);
+      } else {
+        setPoint(data);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao carregar detalhes';
+      setErrorMessage(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [pontoId]);
+
+  useEffect(() => {
+    if (pontoId) {
+      carregarPonto();
+    }
+  }, [pontoId, carregarPonto]);
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (navigation?.goBack) {
+      navigation.goBack();
+    }
+  };
+
+  const handleOpenDonation = () => {
+    if (onOpenDonation) {
+      onOpenDonation();
+    } else if (navigation?.navigate && point) {
+      navigation.navigate('Donation', { ponto: point, returnScreen: 'Detail' });
+    }
+  };
+
+  const handleOpenPointItems = () => {
+    if (onOpenPointItems) {
+      onOpenPointItems();
+    } else if (navigation?.navigate && point) {
+      navigation.navigate('PointItems', { pontoId: point.id, pontoNome: point.nome });
+    }
+  };
+
   const handleCall = () => {
-    const cleanPhone = point.phone.replace(/[^0-9]/g, '');
+    if (!point?.telefone) return;
+    const cleanPhone = point.telefone.replace(/[^0-9]/g, '');
     Linking.openURL(`tel:${cleanPhone}`).catch(() => {
       Alert.alert('Erro', 'Não foi possível iniciar a ligação neste dispositivo.');
     });
   };
 
   const handleRoute = () => {
-    const query = encodeURIComponent(point.address);
+    if (!point) return;
+    const query = encodeURIComponent(point.endereco || `${point.latitude},${point.longitude}`);
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`).catch(() => {
       Alert.alert('Erro', 'Não foi possível abrir o aplicativo de mapas.');
     });
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeContainer}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primaryDark} />
+          <Text style={styles.loadingText}>Carregando detalhes do ponto...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <SafeAreaView style={styles.safeContainer}>
+        <View style={styles.header}>
+          <TouchableOpacity activeOpacity={0.7} onPress={handleBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Voltar</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.centerContainer}>
+          <Text style={styles.notFoundIcon}>🔍</Text>
+          <Text style={styles.notFoundTitle}>Ponto não encontrado</Text>
+          <Text style={styles.notFoundSubtitle}>
+            O ponto de coleta solicitado não existe ou foi removido do sistema (código 404).
+          </Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleBack} activeOpacity={0.8}>
+            <Text style={styles.primaryButtonText}>Voltar para a lista</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (errorMessage || !point) {
+    return (
+      <SafeAreaView style={styles.safeContainer}>
+        <View style={styles.header}>
+          <TouchableOpacity activeOpacity={0.7} onPress={handleBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Voltar</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.centerContainer}>
+          <Text style={styles.notFoundIcon}>⚠️</Text>
+          <Text style={styles.notFoundTitle}>Erro ao buscar ponto</Text>
+          <Text style={styles.notFoundSubtitle}>{errorMessage || 'Não foi possível carregar os dados.'}</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={carregarPonto} activeOpacity={0.8}>
+            <Text style={styles.primaryButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
-      
-      {/* Custom Header */}
+
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onBack}
-          style={styles.backButton}
-        >
+        <TouchableOpacity activeOpacity={0.7} onPress={handleBack} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Voltar</Text>
         </TouchableOpacity>
-        <Text style={styles.headerCategory}>{point.category}</Text>
+        <Text style={styles.headerCategory}>{point.tipo}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Title Section */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>{point.name}</Text>
-          <View style={styles.ratingRow}>
-            <Text style={styles.starIcon}>★</Text>
-            <Text style={styles.ratingText}>{point.rating.toFixed(1)}</Text>
-            <Text style={styles.ratingCount}> (Ponto Verificado)</Text>
-          </View>
+          <Text style={styles.title}>{point.nome}</Text>
+          <Text style={styles.bairroSubtitle}>📍 {point.bairro}</Text>
         </View>
 
-        {/* Detailed Description */}
+        {/* Description Section */}
+        {point.descricao ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sobre o Ponto</Text>
+            <Text style={styles.descriptionText}>{point.descricao}</Text>
+          </View>
+        ) : null}
+
+        {/* Accepted Items / What it receives or distributes */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sobre o Ponto</Text>
-          <Text style={styles.descriptionText}>{point.description}</Text>
+          <Text style={styles.sectionTitle}>O que o ponto recebe ou distribui</Text>
+          <View style={styles.itensCard}>
+            <Text style={styles.itensText}>{point.itens}</Text>
+          </View>
         </View>
 
         {/* Info Grid (Address, Hours, Phone) */}
@@ -74,7 +208,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpe
             <Text style={styles.infoIcon}>📍</Text>
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Endereço</Text>
-              <Text style={styles.infoValue}>{point.address}</Text>
+              <Text style={styles.infoValue}>{point.endereco}</Text>
             </View>
           </View>
 
@@ -84,46 +218,38 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpe
             <Text style={styles.infoIcon}>⏰</Text>
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Horário de Funcionamento</Text>
-              <Text style={styles.infoValue}>{point.hours}</Text>
+              <Text style={styles.infoValue}>{point.horarioFuncionamento}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRowSeparator} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📞</Text>
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoLabel}>Telefone / Contato</Text>
-              <Text style={styles.infoValue}>{point.phone}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Accepted Materials Badges Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Materiais Aceitos</Text>
-          <View style={styles.materialsContainer}>
-            {point.acceptedMaterials.map((material, index) => (
-              <View key={index} style={styles.materialTag}>
-                <Text style={styles.materialTagText}>{material}</Text>
+          {point.telefone ? (
+            <>
+              <View style={styles.infoRowSeparator} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoIcon}>📞</Text>
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Telefone / Contato</Text>
+                  <Text style={styles.infoValue}>{point.telefone}</Text>
+                </View>
               </View>
-            ))}
-          </View>
+            </>
+          ) : null}
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actionContainer}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={onOpenPointItems}
+            onPress={handleOpenPointItems}
             style={styles.secondaryButton}
             accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>Ver itens cadastrados neste ponto</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={onOpenDonation}
+            onPress={handleOpenDonation}
             style={styles.primaryButton}
             accessibilityRole="button"
           >
@@ -133,18 +259,20 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({ point, onBack, onOpe
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleRoute}
-            style={styles.secondaryButton}
+            style={styles.outlineButton}
           >
-            <Text style={styles.secondaryButtonText}>Como Chegar (Mapas)</Text>
+            <Text style={styles.outlineButtonText}>Como Chegar (Mapas)</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleCall}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Ligar para o Ponto</Text>
-          </TouchableOpacity>
+          {point.telefone ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleCall}
+              style={styles.outlineButton}
+            >
+              <Text style={styles.outlineButtonText}>Ligar para o Ponto</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -168,159 +296,177 @@ const styles = StyleSheet.create({
   },
   backButton: {
     paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
   },
   backButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.colors.primaryDark,
   },
   headerCategory: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: theme.colors.textSecondary,
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
     borderRadius: theme.borderRadius.round,
-    overflow: 'hidden',
   },
   scrollContent: {
-    width: theme.layout.contentWidth,
-    maxWidth: theme.layout.contentMaxWidth,
-    alignSelf: 'center',
-    paddingVertical: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.xxl,
   },
   titleSection: {
-    marginBottom: theme.spacing.xl,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.cardBg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     color: theme.colors.textMain,
-    lineHeight: 34,
     marginBottom: theme.spacing.xs,
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  starIcon: {
-    color: theme.colors.ratingActive,
-    fontSize: 18,
-    marginRight: theme.spacing.xs,
-  },
-  ratingText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.textMain,
-  },
-  ratingCount: {
-    fontSize: 14,
-    color: theme.colors.primaryDark,
+  bairroSubtitle: {
+    fontSize: 15,
     fontWeight: '600',
+    color: theme.colors.primaryDark,
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: theme.colors.textMain,
     marginBottom: theme.spacing.sm,
   },
   descriptionText: {
     fontSize: 15,
-    color: theme.colors.textSecondary,
     lineHeight: 22,
+    color: theme.colors.textSecondary,
+  },
+  itensCard: {
+    backgroundColor: theme.colors.cardBg,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  itensText: {
+    fontSize: 14,
+    color: theme.colors.textMain,
+    lineHeight: 20,
   },
   infoCard: {
+    margin: theme.spacing.lg,
+    padding: theme.spacing.md,
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
     ...theme.shadows.light,
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-  },
-  infoRowSeparator: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: theme.spacing.xs,
   },
   infoIcon: {
     fontSize: 20,
     marginRight: theme.spacing.md,
-    marginTop: 2,
   },
   infoTextContainer: {
     flex: 1,
   },
   infoLabel: {
     fontSize: 12,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
+    color: theme.colors.textSecondary,
     textTransform: 'uppercase',
-    marginBottom: 2,
+    fontWeight: '600',
   },
   infoValue: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    lineHeight: 18,
+    fontSize: 15,
+    color: theme.colors.textMain,
+    marginTop: 2,
+    fontWeight: '500',
   },
-  materialsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -theme.spacing.xs,
-  },
-  materialTag: {
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    margin: theme.spacing.xs,
-  },
-  materialTagText: {
-    color: theme.colors.primaryText,
-    fontSize: 13,
-    fontWeight: '600',
+  infoRowSeparator: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
   },
   actionContainer: {
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   primaryButton: {
     backgroundColor: theme.colors.primaryDark,
+    paddingVertical: 14,
     borderRadius: theme.borderRadius.md,
-    height: 52,
-    justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.light,
+    justifyContent: 'center',
   },
   primaryButtonText: {
-    color: theme.colors.white,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: theme.colors.cardBg,
+    backgroundColor: theme.colors.primaryLight,
+    paddingVertical: 14,
     borderRadius: theme.borderRadius.md,
-    height: 52,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.primaryDark,
+  },
+  secondaryButtonText: {
+    color: theme.colors.primaryDark,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  outlineButton: {
+    backgroundColor: theme.colors.cardBg,
+    paddingVertical: 12,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  secondaryButtonText: {
+  outlineButtonText: {
+    color: theme.colors.textMain,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: 15,
     color: theme.colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '700',
+  },
+  notFoundIcon: {
+    fontSize: 48,
+    marginBottom: theme.spacing.md,
+  },
+  notFoundTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.textMain,
+    marginBottom: theme.spacing.sm,
+  },
+  notFoundSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.xl,
+    maxWidth: 300,
   },
 });

@@ -12,42 +12,25 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { excluirDoacao } from '../data/doacoesStorage';
-import { mockCollectionPoints } from '../data/mockPoints';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+import { Doacao } from '../types/doacao';
+import { excluirDoacao } from '../services/doacoesStorage';
 import { theme } from '../styles/theme';
-import { DonationItem } from '../types/types';
 
-/**
- * Parâmetros esperados pela rota (route.params)
- * Suporta tanto o objeto 'donation' empacotado quanto parâmetros diretos
- */
-export interface DonationDetailRouteParams {
-  donation?: DonationItem;
-  doacao?: DonationItem;
-  id?: string;
-  itemType?: string;
-  quantity?: number;
-  pointId?: string;
-  criadoEm?: string;
-  [key: string]: unknown;
-}
-
-export interface DonationDetailScreenProps {
-  route?: {
-    params?: DonationDetailRouteParams;
-  };
-  navigation?: {
-    goBack?: () => void;
-    navigate?: (screen: string, params?: unknown) => void;
-  };
-  donation?: DonationItem;
+export interface DonationDetailCustomProps {
+  donation?: Doacao;
   onBack?: () => void;
   onDeleteSuccess?: () => void;
 }
 
+export type DonationDetailScreenProps = Partial<
+  NativeStackScreenProps<RootStackParamList, 'DonationDetail'>
+> &
+  DonationDetailCustomProps;
+
 /**
  * Converte a data ISO em formato legível brasileiro: "DD/MM/AAAA às HH:mm"
- * Exemplo didático de formatação sem dependências externas.
  */
 export const formatarDataLegivel = (isoString?: string): string => {
   if (!isoString) return 'Data não informada';
@@ -67,15 +50,6 @@ export const formatarDataLegivel = (isoString?: string): string => {
   }
 };
 
-/**
- * Tela de Detalhes da Doação
- * 
- * Critérios atendidos:
- * 1. Recebe a doação por route.params e mostra todos os campos, incluindo a data formatada de forma legível.
- * 2. O botão de excluir pede confirmação via Alert.alert (com as opções Cancelar e Excluir).
- * 3. Cancelar não apaga nada.
- * 4. Confirmar apaga a doação do AsyncStorage (excluirDoacao(id)), volta ao histórico e a doação some da lista.
- */
 export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
   route,
   navigation,
@@ -85,24 +59,22 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Extração segura da doação a partir de route.params ou props
-  const params = route?.params;
-  const donation: DonationItem | undefined =
-    propDonation ??
-    params?.donation ??
-    params?.doacao ??
-    (params?.id && params?.itemType ? (params as unknown as DonationItem) : undefined);
-
-  // Busca as informações do ponto de coleta associado
-  const collectionPoint = donation
-    ? mockCollectionPoints.find((p) => p.id === donation.pointId)
+  const raw = route?.params?.doacao ?? propDonation;
+  const donation: Doacao | undefined = raw
+    ? {
+        id: String(raw.id),
+        tipoItem: raw.tipoItem || (raw as unknown as { itemType?: string }).itemType || '',
+        quantidade: Number(
+          raw.quantidade ?? (raw as unknown as { quantity?: number }).quantity ?? 1
+        ),
+        pontoDestino:
+          raw.pontoDestino ||
+          (raw as unknown as { pointId?: string }).pointId ||
+          'Ponto de coleta',
+        criadoEm: raw.criadoEm || new Date().toISOString(),
+      }
     : undefined;
 
-  const pointName = collectionPoint ? collectionPoint.name : 'Ponto de coleta';
-  const pointAddress = collectionPoint ? collectionPoint.address : 'Endereço não disponível';
-  const pointCategory = collectionPoint ? collectionPoint.category : 'Geral';
-
-  // Manipulador de navegação de retorno
   const handleVoltar = () => {
     if (onBack) {
       onBack();
@@ -111,19 +83,13 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     }
   };
 
-  /**
-   * Executa a exclusão definitiva no AsyncStorage através da função do arquivo de acesso
-   */
   const executarExclusao = async () => {
     if (!donation?.id || isDeleting) return;
 
     try {
       setIsDeleting(true);
-
-      // Chamada da função centralizada de exclusão no AsyncStorage
       await excluirDoacao(donation.id);
 
-      // Retorno ao histórico após exclusão concluída
       if (onDeleteSuccess) {
         onDeleteSuccess();
       } else if (navigation?.goBack) {
@@ -137,14 +103,9 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     }
   };
 
-  /**
-   * Solicita confirmação de exclusão ao usuário via Alert.alert
-   * Opções: Cancelar (não faz nada) e Excluir (apaga e volta ao histórico)
-   */
   const handleConfirmarExclusao = () => {
     if (!donation?.id || isDeleting) return;
 
-    // Diálogo nativo conforme especificação
     Alert.alert(
       'Excluir doação',
       'Tem certeza de que deseja excluir esta doação do histórico? Esta ação não pode ser desfeita.',
@@ -152,7 +113,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
         {
           text: 'Cancelar',
           style: 'cancel',
-          // Cancelar não apaga nada
         },
         {
           text: 'Excluir',
@@ -162,7 +122,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
       ]
     );
 
-    // Suporte para execução no navegador Web (onde react-native-web possui Alert.alert sem UI nativa)
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
       const confirmou = window.confirm(
         'Tem certeza de que deseja excluir esta doação do histórico? Esta ação não pode ser desfeita.'
@@ -173,7 +132,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     }
   };
 
-  // Estado caso nenhuma doação tenha sido fornecida nos parâmetros
   if (!donation) {
     return (
       <SafeAreaView style={styles.safeContainer}>
@@ -213,7 +171,7 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     <SafeAreaView style={styles.safeContainer} testID="donation-detail-screen">
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
 
-      {/* Cabeçalho de Navegação */}
+      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={handleVoltar}
@@ -227,65 +185,46 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
         <Text style={styles.headerTitle}>Detalhe da doação</Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          {/* Card de Destaque / Resumo Principal */}
+          {/* Hero Card */}
           <View style={styles.heroCard}>
             <View style={styles.heroIconBadge}>
               <Text style={styles.heroIconText}>📦</Text>
             </View>
             <View style={styles.heroInfo}>
               <Text style={styles.heroTitle} testID="donation-field-itemType">
-                {donation.itemType}
+                {donation.tipoItem}
               </Text>
               <View style={styles.quantityPill}>
                 <Text style={styles.quantityPillText} testID="donation-field-quantity">
-                  {donation.quantity} {donation.quantity === 1 ? 'item doado' : 'itens doados'}
+                  {donation.quantidade} {donation.quantidade === 1 ? 'item doado' : 'itens doados'}
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Seção com Todos os Campos da Doação */}
+          {/* Details Section */}
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Informações da Doação</Text>
 
-            {/* Campo 1: Tipo do Item */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Tipo do item:</Text>
-              <Text style={styles.detailValue}>{donation.itemType}</Text>
+              <Text style={styles.detailValue}>{donation.tipoItem}</Text>
             </View>
 
-            {/* Campo 2: Quantidade */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Quantidade:</Text>
-              <Text style={styles.detailValue}>{donation.quantity} unidades</Text>
+              <Text style={styles.detailValue}>{donation.quantidade} unidades</Text>
             </View>
 
-            {/* Campo 3: Ponto de Coleta de Destino */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Ponto de destino:</Text>
               <Text style={styles.detailValue} testID="donation-field-point">
-                {pointName}
+                {donation.pontoDestino}
               </Text>
             </View>
 
-            {/* Campo 4: Categoria do Ponto */}
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Categoria:</Text>
-              <Text style={styles.detailValue}>{pointCategory}</Text>
-            </View>
-
-            {/* Campo 5: Endereço do Ponto */}
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Endereço:</Text>
-              <Text style={styles.detailValue}>{pointAddress}</Text>
-            </View>
-
-            {/* Campo 6: Data do Registro formatada de forma legível */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Data e horário:</Text>
               <Text style={styles.detailValue} testID="donation-field-date">
@@ -293,7 +232,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
               </Text>
             </View>
 
-            {/* Campo 7: Identificador Único do Registro */}
             <View style={[styles.detailRow, styles.lastRow]}>
               <Text style={styles.detailLabel}>Código do registro:</Text>
               <Text style={styles.detailCodeValue} testID="donation-field-id">
@@ -302,45 +240,27 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
             </View>
           </View>
 
-          {/* Card Informativo */}
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeIcon}>ℹ️</Text>
-            <Text style={styles.noticeText}>
-              Este registro está salvo localmente na memória do aplicativo. Caso tenha sido
-              cadastrado por engano, você pode excluí-lo permanentemente abaixo.
+          {/* Delete Action Section */}
+          <View style={styles.actionCard}>
+            <Text style={styles.actionCardTitle}>Gerenciar Registro</Text>
+            <Text style={styles.actionCardDescription}>
+              Caso esta doação tenha sido registrada por engano ou precise ser corrigida, você pode
+              excluí-la do histórico permanentemente.
             </Text>
-          </View>
 
-          {/* Área de Ações: Botão Excluir */}
-          <View style={styles.actionsContainer}>
             <TouchableOpacity
-              activeOpacity={0.8}
+              style={styles.deleteButton}
               onPress={handleConfirmarExclusao}
               disabled={isDeleting}
               accessibilityRole="button"
               accessibilityLabel="Excluir doação"
-              style={[styles.deleteButton, isDeleting && styles.buttonDisabled]}
               testID="button-delete-donation"
             >
               {isDeleting ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color={theme.colors.white} />
-                  <Text style={styles.deleteButtonText}>Excluindo...</Text>
-                </View>
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.deleteButtonText}>🗑️ Excluir doação</Text>
+                <Text style={styles.deleteButtonText}>Excluir esta doação</Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleVoltar}
-              disabled={isDeleting}
-              accessibilityRole="button"
-              accessibilityLabel="Voltar ao histórico"
-              style={styles.cancelSecondaryButton}
-            >
-              <Text style={styles.cancelSecondaryButtonText}>Voltar ao histórico</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -364,30 +284,28 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
   backButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingRight: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
+    paddingRight: theme.spacing.md,
   },
   backButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.colors.primaryDark,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.textMain,
-    flexShrink: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xxxl,
+    paddingBottom: theme.spacing.xxl,
   },
   content: {
     width: theme.layout.contentWidth,
     maxWidth: theme.layout.contentMaxWidth,
     alignSelf: 'center',
     paddingTop: theme.spacing.lg,
+    gap: theme.spacing.md,
   },
   heroCard: {
     backgroundColor: theme.colors.cardBg,
@@ -397,16 +315,15 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
     ...theme.shadows.light,
   },
   heroIconBadge: {
     width: 56,
     height: 56,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 28,
     backgroundColor: theme.colors.primaryLight,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: theme.spacing.md,
   },
   heroIconText: {
@@ -416,7 +333,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: theme.colors.textMain,
     marginBottom: 4,
@@ -425,11 +342,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: theme.colors.primaryLight,
     paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: theme.borderRadius.round,
   },
   quantityPillText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.primaryText,
   },
@@ -439,11 +356,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
     ...theme.shadows.light,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: theme.colors.textMain,
     marginBottom: theme.spacing.md,
@@ -453,135 +369,96 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
+    alignItems: 'flex-start',
   },
   lastRow: {
     borderBottomWidth: 0,
-    paddingBottom: 0,
   },
   detailLabel: {
+    width: 140,
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.textSecondary,
-    width: 140,
   },
   detailValue: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '500',
     color: theme.colors.textMain,
-    flex: 1,
   },
   detailCodeValue: {
+    flex: 1,
     fontSize: 12,
+    color: theme.colors.textMuted,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    color: theme.colors.textSecondary,
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
-  noticeCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
-    alignItems: 'flex-start',
-  },
-  noticeIcon: {
-    fontSize: 18,
-    marginRight: theme.spacing.sm,
-    marginTop: 1,
-  },
-  noticeText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#1E40AF',
-    flex: 1,
-  },
-  actionsContainer: {
-    gap: theme.spacing.md,
-  },
-  deleteButton: {
-    backgroundColor: theme.colors.error,
-    borderRadius: theme.borderRadius.md,
-    minHeight: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    ...theme.shadows.light,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  deleteButtonText: {
-    color: theme.colors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cancelSecondaryButton: {
+  actionCard: {
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
+    borderColor: '#FEE2E2',
+    padding: theme.spacing.lg,
+    ...theme.shadows.light,
   },
-  cancelSecondaryButtonText: {
+  actionCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#991B1B',
+    marginBottom: 4,
+  },
+  actionCardDescription: {
+    fontSize: 13,
     color: theme.colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: theme.spacing.md,
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    padding: theme.spacing.xxl,
   },
   emptyIcon: {
-    fontSize: 50,
+    fontSize: 48,
     marginBottom: theme.spacing.md,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: theme.colors.textMain,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   emptySubtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing.xl,
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
   },
   primaryButton: {
     backgroundColor: theme.colors.primaryDark,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 12,
     borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingVertical: theme.spacing.md,
-    minHeight: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   primaryButtonText: {
-    color: theme.colors.white,
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '700',
   },
 });
-
-export const DetalheDoacaoScreen = DonationDetailScreen;
-export default DonationDetailScreen;
