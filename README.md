@@ -60,10 +60,22 @@ npm install
 
 ### ▶️ Como Rodar a Aplicação
 
-Após a conclusão da instalação das dependências, você está pronto para iniciar o servidor de desenvolvimento.
+#### 1. Inicie a API Spring Boot (Backend)
+Em um terminal separado:
+```bash
+cd backend
+./mvnw spring-boot:run
+```
+*(No Windows PowerShell / Prompt: `.\mvnw.cmd spring-boot:run`)*
 
-**1. Inicie o servidor do Expo**
-Execute o comando abaixo no terminal:
+- A API subirá na porta `8080`: `http://localhost:8080/pontos`
+- Console H2: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:institutodb`, Usuário: `sa`, Senha em branco)
+- Documentação dos endpoints:
+  - `GET /pontos` (paginado, parâmetros `page`, `size`, `sort`, `bairro`, `tipo`)
+  - `GET /pontos/{id}` (detalhe do ponto com retorno 404 se inexistente)
+
+#### 2. Inicie o aplicativo móvel (Frontend)
+No terminal da raiz do projeto:
 ```bash
 npm start
 ```

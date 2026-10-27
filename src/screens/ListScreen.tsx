@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,90 +7,103 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { mockCollectionPoints, categories } from '../data/mockPoints';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+import { Ponto } from '../types/ponto';
+import { listarPontos } from '../services/pontosService';
 import { PointCard } from '../components/PointCard';
-import { CollectionPoint } from '../types/types';
 import { theme } from '../styles/theme';
-import { obterFiltroPontos, salvarFiltroPontos } from '../data/rascunhosStorage';
 
-interface ListScreenProps {
-  onSelectPoint: (point: CollectionPoint) => void;
-  onOpenMyDonations: () => void;
+export interface ListScreenCustomProps {
+  onSelectPoint?: (point: Ponto) => void;
+  onOpenMyDonations?: () => void;
 }
 
-export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyDonations }) => {
+export type ListScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'List'>> &
+  ListScreenCustomProps;
+
+const FILTROS_TIPO = ['Todos', 'RECEBE', 'DISTRIBUI', 'AMBOS'];
+
+export const ListScreen: React.FC<ListScreenProps> = ({
+  navigation,
+  onSelectPoint,
+  onOpenMyDonations,
+}) => {
+  const [pontos, setPontos] = useState<Ponto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [filterLoaded, setFilterLoaded] = useState(false);
+  const [selectedTipo, setSelectedTipo] = useState('Todos');
 
-  // Carrega busca e categoria salvas ao abrir a tela
+  const carregarPontos = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const response = await listarPontos({
+        tipo: selectedTipo === 'Todos' ? undefined : selectedTipo,
+      });
+      setPontos(response.content || []);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao carregar pontos';
+      setErrorMessage(
+        `Não foi possível carregar os pontos da API (${msg}). Verifique se o servidor Spring Boot está ligado.`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTipo]);
+
   useEffect(() => {
-    let isMounted = true;
-    obterFiltroPontos().then((filtro) => {
-      if (!isMounted) return;
-      if (filtro) {
-        if (typeof filtro.searchQuery === 'string') setSearchQuery(filtro.searchQuery);
-        if (typeof filtro.selectedCategory === 'string') setSelectedCategory(filtro.selectedCategory);
-      }
-      setFilterLoaded(true);
-    });
+    carregarPontos();
+  }, [carregarPontos]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Salva alterações nos filtros automaticamente
-  useEffect(() => {
-    if (!filterLoaded) return;
-    salvarFiltroPontos({ searchQuery, selectedCategory });
-  }, [searchQuery, selectedCategory, filterLoaded]);
-
-  // Filter logic: simple, efficient, and responsive
-  const filteredPoints = useMemo(() => {
-    return mockCollectionPoints.filter((point) => {
-      // 1. Filter by category if one is active
-      const matchesCategory =
-        selectedCategory === 'Todos' || point.category === selectedCategory;
-
-      // 2. Filter by search query text (name, description, or materials)
-      const query = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        query === '' ||
-        point.name.toLowerCase().includes(query) ||
-        point.shortDescription.toLowerCase().includes(query) ||
-        point.category.toLowerCase().includes(query) ||
-        point.acceptedMaterials.some((material) =>
-          material.toLowerCase().includes(query)
-        );
-
-      return matchesCategory && matchesSearch;
-    });
-  }, [searchQuery, selectedCategory]);
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
+  const handleSelectPoint = (point: Ponto) => {
+    if (onSelectPoint) {
+      onSelectPoint(point);
+    }
+    if (navigation?.navigate) {
+      navigation.navigate('Detail', { pontoId: point.id, ponto: point });
+    }
   };
 
-  // Render a single category filter tab
-  const renderCategoryItem = ({ item }: { item: string }) => {
-    const isSelected = selectedCategory === item;
+  const handleOpenMyDonations = () => {
+    if (onOpenMyDonations) {
+      onOpenMyDonations();
+    }
+    if (navigation?.navigate) {
+      navigation.navigate('MyDonations');
+    }
+  };
+
+  const filteredPoints = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return pontos.filter((point) => {
+      const matchesSearch =
+        query === '' ||
+        point.nome.toLowerCase().includes(query) ||
+        point.endereco.toLowerCase().includes(query) ||
+        point.bairro.toLowerCase().includes(query) ||
+        point.itens.toLowerCase().includes(query) ||
+        point.tipo.toLowerCase().includes(query) ||
+        (point.descricao && point.descricao.toLowerCase().includes(query));
+
+      return matchesSearch;
+    });
+  }, [pontos, searchQuery]);
+
+  const renderTipoFilter = ({ item }: { item: string }) => {
+    const isSelected = selectedTipo === item;
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => setSelectedCategory(item)}
-        style={[
-          styles.categoryPill,
-          isSelected && styles.categoryPillSelected,
-        ]}
+        onPress={() => setSelectedTipo(item)}
+        style={[styles.categoryPill, isSelected && styles.categoryPillSelected]}
       >
         <Text
-          style={[
-            styles.categoryPillText,
-            isSelected && styles.categoryPillTextSelected,
-          ]}
+          style={[styles.categoryPillText, isSelected && styles.categoryPillTextSelected]}
         >
           {item}
         </Text>
@@ -107,11 +120,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyD
           <View style={styles.headerRow}>
             <View style={styles.headerTitles}>
               <Text style={styles.logoTitle}>Mão Amiga</Text>
-              <Text style={styles.logoSubtitle}>Encontre pontos de descarte e coleta seletiva</Text>
+              <Text style={styles.logoSubtitle}>Encontre pontos de coleta e distribuição</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={onOpenMyDonations}
+              onPress={handleOpenMyDonations}
               style={styles.myDonationsButton}
               accessibilityRole="button"
               accessibilityLabel="Minhas doações"
@@ -121,11 +134,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyD
           </View>
         </View>
 
-        {/* Search Filter input */}
+        {/* Search input */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Pesquise por nome, material (ex: pilhas)..."
+            placeholder="Pesquise por nome, bairro, alimento..."
             placeholderTextColor={theme.colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -134,7 +147,7 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyD
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
-              onPress={handleClearSearch}
+              onPress={() => setSearchQuery('')}
               style={styles.clearButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -143,11 +156,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyD
           )}
         </View>
 
-        {/* Categories horizontal filter list */}
+        {/* Categories/Types horizontal filter */}
         <View style={styles.categoriesWrapper}>
           <FlatList
-            data={categories}
-            renderItem={renderCategoryItem}
+            data={FILTROS_TIPO}
+            renderItem={renderTipoFilter}
             keyExtractor={(item) => item}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -155,37 +168,57 @@ export const ListScreen: React.FC<ListScreenProps> = ({ onSelectPoint, onOpenMyD
           />
         </View>
 
-        {/* Collection points flatlist */}
-        <FlatList
-          data={filteredPoints}
-          keyExtractor={(item) => item.id}
-          style={styles.pointsList}
-          renderItem={({ item }) => (
-            <PointCard point={item} onPress={() => onSelectPoint(item)} />
-          )}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyTitle}>Nenhum ponto encontrado</Text>
-              <Text style={styles.emptySubtitle}>
-                Tente ajustar os termos de pesquisa ou selecione outra categoria de filtro.
-              </Text>
-              {(searchQuery !== '' || selectedCategory !== 'Todos') && (
-                <TouchableOpacity
-                  style={styles.resetButton}
-                  onPress={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('Todos');
-                  }}
-                >
-                  <Text style={styles.resetButtonText}>Limpar Filtros</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
-        />
+        {/* Content State: Loading, Error, or List */}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primaryDark} />
+            <Text style={styles.loadingText}>Carregando pontos da API...</Text>
+          </View>
+        ) : errorMessage ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorTitle}>Não foi possível carregar os pontos</Text>
+            <Text style={styles.errorMessage}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={carregarPontos}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredPoints}
+            keyExtractor={(item) => String(item.id)}
+            style={styles.pointsList}
+            renderItem={({ item }) => (
+              <PointCard point={item} onPress={() => handleSelectPoint(item)} />
+            )}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyTitle}>Nenhum ponto encontrado</Text>
+                <Text style={styles.emptySubtitle}>
+                  Tente ajustar os termos de pesquisa ou selecione outro tipo de filtro.
+                </Text>
+                {(searchQuery !== '' || selectedTipo !== 'Todos') && (
+                  <TouchableOpacity
+                    style={styles.resetButton}
+                    onPress={() => {
+                      setSearchQuery('');
+                      setSelectedTipo('Todos');
+                    }}
+                  >
+                    <Text style={styles.resetButtonText}>Limpar Filtros</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -226,18 +259,15 @@ const styles = StyleSheet.create({
   logoSubtitle: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
+    marginTop: 2,
   },
   myDonationsButton: {
     backgroundColor: theme.colors.primaryLight,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.primaryDark,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 38,
   },
   myDonationsButtonText: {
     fontSize: 13,
@@ -251,23 +281,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingHorizontal: theme.spacing.md,
-    height: 52,
     marginBottom: theme.spacing.md,
     ...theme.shadows.light,
   },
   searchInput: {
     flex: 1,
+    height: 48,
     fontSize: 15,
     color: theme.colors.textMain,
-    height: '100%',
   },
   clearButton: {
-    marginLeft: theme.spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: theme.spacing.xs,
   },
   clearButtonText: {
     fontSize: 16,
@@ -275,59 +302,105 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   categoriesWrapper: {
-    width: theme.layout.contentWidth,
-    maxWidth: theme.layout.contentMaxWidth,
-    marginBottom: theme.spacing.lg,
+    width: '100%',
+    marginBottom: theme.spacing.md,
   },
   categoriesList: {
-    paddingHorizontal: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
   categoryPill: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.round,
     backgroundColor: theme.colors.cardBg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginRight: theme.spacing.sm,
   },
   categoryPillSelected: {
     backgroundColor: theme.colors.primaryDark,
     borderColor: theme.colors.primaryDark,
   },
   categoryPillText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textSecondary,
   },
   categoryPillTextSelected: {
-    color: theme.colors.white,
-  },
-  listContent: {
-    width: '100%',
-    paddingBottom: theme.spacing.xxl,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   pointsList: {
+    width: '100%',
+  },
+  listContent: {
     width: theme.layout.contentWidth,
     maxWidth: theme.layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingBottom: theme.spacing.xl,
+  },
+  centerContainer: {
     flex: 1,
-    minWidth: 0,
-  },
-  emptyContainer: {
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.xxxl,
-    paddingHorizontal: theme.spacing.xl,
+    alignItems: 'center',
+    padding: theme.spacing.xl,
   },
-  emptyIcon: {
+  loadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+    maxWidth: 400,
+  },
+  errorIcon: {
     fontSize: 48,
     marginBottom: theme.spacing.md,
   },
-  emptyTitle: {
+  errorTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: theme.colors.textMain,
     marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primaryDark,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    padding: theme.spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: theme.spacing.sm,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: theme.colors.textMain,
+    marginBottom: theme.spacing.xs,
   },
   emptySubtitle: {
     fontSize: 14,
@@ -337,14 +410,16 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   resetButton: {
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primaryDark,
   },
   resetButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.primaryText,
+    fontSize: 13,
+    color: theme.colors.primaryDark,
+    fontWeight: '600',
   },
 });

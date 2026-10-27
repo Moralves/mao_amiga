@@ -14,58 +14,36 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { listarDoacoes } from '../data/doacoesStorage';
-import { mockCollectionPoints } from '../data/mockPoints';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+import { Doacao } from '../types/doacao';
+import { listarDoacoes } from '../services/doacoesStorage';
 import { DonationCard } from '../components/DonationCard';
 import { DonationSummary } from '../components/DonationSummary';
 import { theme } from '../styles/theme';
-import { DonationItem } from '../types/types';
-import { obterFiltroMinhasDoacoes, salvarFiltroMinhasDoacoes } from '../data/rascunhosStorage';
 
-interface MyDonationsScreenProps {
-  onBack: () => void;
-  onGoToCadastro: () => void;
-  onSelectDonation?: (donation: DonationItem) => void;
-  navigation?: {
-    navigate?: (screen: string, params?: unknown) => void;
-    addListener?: (event: string, callback: () => void) => () => void;
-  };
+export interface MyDonationsScreenCustomProps {
+  onBack?: () => void;
+  onGoToCadastro?: () => void;
+  onSelectDonation?: (donation: Doacao) => void;
 }
 
+export type MyDonationsScreenProps = Partial<
+  NativeStackScreenProps<RootStackParamList, 'MyDonations'>
+> &
+  MyDonationsScreenCustomProps;
+
 export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
+  navigation,
   onBack,
   onGoToCadastro,
   onSelectDonation,
-  navigation,
 }) => {
-  const [donations, setDonations] = useState<DonationItem[]>([]);
+  const [donations, setDonations] = useState<Doacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterLoaded, setFilterLoaded] = useState(false);
-
-  // Carrega busca salva do histórico de doações ao abrir a tela
-  useEffect(() => {
-    let isMounted = true;
-    obterFiltroMinhasDoacoes().then((filtro) => {
-      if (!isMounted) return;
-      if (filtro && typeof filtro.searchQuery === 'string') {
-        setSearchQuery(filtro.searchQuery);
-      }
-      setFilterLoaded(true);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Salva busca em andamento automaticamente
-  useEffect(() => {
-    if (!filterLoaded) return;
-    salvarFiltroMinhasDoacoes({ searchQuery });
-  }, [searchQuery, filterLoaded]);
 
   const carregarDoacoes = useCallback(async () => {
     try {
@@ -86,7 +64,6 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
   useEffect(() => {
     carregarDoacoes();
 
-    // Se utilizado com React Navigation, atualiza ao receber foco
     if (navigation?.addListener) {
       const unsubscribe = navigation.addListener('focus', carregarDoacoes);
       return unsubscribe;
@@ -98,26 +75,43 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
     carregarDoacoes();
   };
 
-  const getPointName = (pointId: string): string => {
-    const point = mockCollectionPoints.find((p) => p.id === pointId);
-    return point ? point.name : 'Ponto de coleta';
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (navigation?.goBack) {
+      navigation.goBack();
+    }
+  };
+
+  const handleGoToCadastro = () => {
+    if (onGoToCadastro) {
+      onGoToCadastro();
+    } else if (navigation?.navigate) {
+      navigation.navigate('Donation', { returnScreen: 'MyDonations' });
+    }
+  };
+
+  const handleSelectDonation = (donation: Doacao) => {
+    if (onSelectDonation) {
+      onSelectDonation(donation);
+    } else if (navigation?.navigate) {
+      navigation.navigate('DonationDetail', {
+        doacao: donation,
+        returnScreen: 'MyDonations',
+      });
+    }
   };
 
   // Filtra as doações pelo tipo de item enquanto o usuário digita
-  // Não diferencia maiúsculas de minúsculas e calcula a partir do array completo sem guardar 2ª cópia em estado
   const filteredDonations = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
       return donations;
     }
     return donations.filter((donation) =>
-      (donation.itemType || '').toLowerCase().includes(query)
+      (donation.tipoItem || '').toLowerCase().includes(query)
     );
   }, [donations, searchQuery]);
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-  };
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -130,7 +124,7 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <Pressable
-            onPress={onBack}
+            onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Voltar"
             style={styles.backButton}
@@ -173,120 +167,92 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
               </TouchableOpacity>
             </View>
           ) : (
-            <>
-              {/* Resumo com total de doações e quantidade somada por tipo de item */}
-              <DonationSummary donations={donations} />
+            <FlatList
+              data={filteredDonations}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              }
+              ListHeaderComponent={
+                <View style={styles.listHeaderContainer}>
+                  {/* Painel de Resumo Dinâmico */}
+                  <DonationSummary donations={donations} />
 
-              {/* Campo de busca no topo do histórico */}
-              <View style={styles.searchContainer}>
-                <Text style={styles.searchIcon}>🔍</Text>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar por tipo de item (ex: roupa)..."
-                  placeholderTextColor={theme.colors.textMuted}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  accessibilityRole="search"
-                  accessibilityLabel="Buscar doações por tipo de item"
-                  testID="search-input"
+                  {/* Campo de Busca por Tipo */}
+                  {donations.length > 0 && (
+                    <View style={styles.searchSection}>
+                      <Text style={styles.searchSectionLabel}>Buscar por tipo de item</Text>
+                      <View style={styles.searchBar}>
+                        <Text style={styles.searchIcon}>🔍</Text>
+                        <TextInput
+                          style={styles.searchInput}
+                          placeholder="Ex: roupa, alimento, cobertor..."
+                          placeholderTextColor={theme.colors.textMuted}
+                          value={searchQuery}
+                          onChangeText={setSearchQuery}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          accessibilityLabel="Buscar doações por tipo"
+                        />
+                        {searchQuery.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => setSearchQuery('')}
+                            style={styles.clearSearchButton}
+                            accessibilityRole="button"
+                            accessibilityLabel="Limpar busca"
+                          >
+                            <Text style={styles.clearSearchText}>✕</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              }
+              renderItem={({ item }) => (
+                <DonationCard
+                  donation={item}
+                  pointName={item.pontoDestino}
+                  onPress={() => handleSelectDonation(item)}
                 />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={handleClearSearch}
-                    style={styles.clearButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Limpar busca"
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Text style={styles.clearButtonText}>✕</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <FlatList
-                data={filteredDonations}
-                keyExtractor={(item) => item.id}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                renderItem={({ item }) => (
-                  <DonationCard
-                    item={item}
-                    pointName={getPointName(item.pointId)}
-                    onPress={() => {
-                      if (onSelectDonation) {
-                        onSelectDonation(item);
-                      } else if (navigation?.navigate) {
-                        navigation.navigate('DonationDetail', { donation: item });
-                      }
-                    }}
-                  />
-                )}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={handleRefresh}
-                    colors={[theme.colors.primaryDark]}
-                    tintColor={theme.colors.primaryDark}
-                  />
-                }
-                ListEmptyComponent={
-                  searchQuery.trim().length > 0 ? (
-                    <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyIcon}>🔍</Text>
-                      <Text style={styles.emptyTitle}>Nenhuma doação encontrada</Text>
-                      <Text style={styles.emptySubtitle}>
-                        Nenhum resultado encontrado para "{searchQuery.trim()}".
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={handleClearSearch}
-                        accessibilityRole="button"
-                        accessibilityLabel="Limpar busca"
-                        style={styles.emptyButton}
-                      >
-                        <Text style={styles.emptyButtonText}>Limpar busca</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyIcon}>📦</Text>
-                      <Text style={styles.emptyTitle}>Nenhuma doação registrada</Text>
-                      <Text style={styles.emptySubtitle}>
-                        Você ainda não possui doações registradas neste dispositivo. Faça uma doação e ajude a comunidade!
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={onGoToCadastro}
-                        accessibilityRole="button"
-                        accessibilityLabel="Cadastrar doação"
-                        style={styles.emptyButton}
-                      >
-                        <Text style={styles.emptyButtonText}>Cadastrar doação</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )
-                }
-              />
-            </>
-          )}
-
-          {!loading && !error && donations.length > 0 && (
-            <View style={styles.footerContainer}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={onGoToCadastro}
-                accessibilityRole="button"
-                accessibilityLabel="Cadastrar nova doação"
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>+ Cadastrar nova doação</Text>
-              </TouchableOpacity>
-            </View>
+              )}
+              ListEmptyComponent={
+                donations.length === 0 ? (
+                  <View style={styles.emptyContainer} testID="empty-donations-view">
+                    <Text style={styles.emptyIcon}>📦</Text>
+                    <Text style={styles.emptyTitle}>Nenhuma doação cadastrada</Text>
+                    <Text style={styles.emptyText}>
+                      Você ainda não registrou doações. Suas contribuições salvas aparecerão aqui.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={handleGoToCadastro}
+                      style={styles.primaryButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Registrar primeira doação"
+                    >
+                      <Text style={styles.primaryButtonText}>Registrar uma doação</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.emptyFilterContainer}>
+                    <Text style={styles.emptyFilterIcon}>🔎</Text>
+                    <Text style={styles.emptyFilterTitle}>Nenhuma doação encontrada</Text>
+                    <Text style={styles.emptyFilterText}>
+                      Nenhuma doação com o tipo &quot;{searchQuery}&quot; foi localizada.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setSearchQuery('')}
+                      style={styles.clearFilterButton}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.clearFilterButtonText}>Limpar busca</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              }
+            />
           )}
         </View>
       </KeyboardAvoidingView>
@@ -312,45 +278,61 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
   backButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingRight: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
+    paddingRight: theme.spacing.md,
   },
   backButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.colors.primaryDark,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.textMain,
-    flexShrink: 1,
   },
   content: {
     flex: 1,
     width: theme.layout.contentWidth,
     maxWidth: theme.layout.contentMaxWidth,
     alignSelf: 'center',
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
   },
   titleSection: {
-    marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
     color: theme.colors.textMain,
-    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
+    marginTop: 2,
   },
-  searchContainer: {
-    width: '100%',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  listContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
+  listHeaderContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  searchSection: {
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  searchSectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.cardBg,
@@ -358,107 +340,112 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingHorizontal: theme.spacing.md,
-    height: 52,
-    marginBottom: theme.spacing.md,
     ...theme.shadows.light,
   },
   searchIcon: {
     fontSize: 16,
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.xs,
   },
   searchInput: {
     flex: 1,
+    height: 44,
     fontSize: 15,
     color: theme.colors.textMain,
-    height: '100%',
   },
-  clearButton: {
-    marginLeft: theme.spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+  clearSearchButton: {
     padding: theme.spacing.xs,
   },
-  clearButtonText: {
+  clearSearchText: {
     fontSize: 16,
     color: theme.colors.textMuted,
     fontWeight: 'bold',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  primaryButton: {
+    backgroundColor: theme.colors.primaryDark,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.md,
   },
-  listContent: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.lg,
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.xxxl,
-    paddingHorizontal: theme.spacing.lg,
+    padding: theme.spacing.xxl,
+    marginTop: theme.spacing.xl,
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   emptyIcon: {
-    fontSize: 52,
-    marginBottom: theme.spacing.md,
+    fontSize: 48,
+    marginBottom: theme.spacing.sm,
   },
   emptyTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.textMain,
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
+    marginBottom: theme.spacing.xs,
   },
-  emptySubtitle: {
-    fontSize: 15,
+  emptyText: {
+    fontSize: 14,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: theme.spacing.xl,
+    lineHeight: 20,
+    marginBottom: theme.spacing.md,
   },
-  emptyButton: {
-    backgroundColor: theme.colors.primaryDark,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingVertical: theme.spacing.md,
-    minHeight: 50,
-    justifyContent: 'center',
+  emptyFilterContainer: {
     alignItems: 'center',
-    ...theme.shadows.light,
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  emptyButtonText: {
-    color: theme.colors.white,
+  emptyFilterIcon: {
+    fontSize: 36,
+    marginBottom: theme.spacing.xs,
+  },
+  emptyFilterTitle: {
     fontSize: 16,
     fontWeight: '700',
+    color: theme.colors.textMain,
+    marginBottom: 4,
+  },
+  emptyFilterText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: theme.spacing.sm,
+  },
+  clearFilterButton: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    backgroundColor: theme.colors.primaryLight,
+    borderRadius: theme.borderRadius.sm,
+  },
+  clearFilterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.primaryDark,
   },
   messageBox: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xxxl,
+    padding: theme.spacing.xxl,
   },
   message: {
     fontSize: 15,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  footerContainer: {
-    paddingVertical: theme.spacing.sm,
-  },
-  primaryButton: {
-    backgroundColor: theme.colors.primaryDark,
-    borderRadius: theme.borderRadius.md,
-    minHeight: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    ...theme.shadows.light,
-  },
-  primaryButtonText: {
-    color: theme.colors.white,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
-
-export default MyDonationsScreen;
