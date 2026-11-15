@@ -39,7 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+/frontend/ios
+/frontend/android
 
 # Java / Maven backend
 backend/target/
 *.class
+*.log

@@ -1,30 +1,17 @@
 {
-  "name": "mao_amiga",
+  "name": "mao-amiga-monorepo",
   "version": "1.0.0",
-  "main": "index.ts",
+  "private": true,
+  "description": "Repositório Mão Amiga - Frontend (Expo / React Native) e Backend (Spring Boot)",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "dependencies": {
-    "@expo/metro-runtime": "~6.1.2",
-    "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-navigation/native": "^7.5.1",
-    "@react-navigation/native-stack": "^7.21.0",
-    "expo": "~54.0.36",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-web": "^0.21.0"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
-  },
-  "private": true
+    "install:front": "npm --prefix frontend install",
+    "start": "npm --prefix frontend start",
+    "front": "npm --prefix frontend start",
+    "front:android": "npm --prefix frontend run android",
+    "front:ios": "npm --prefix frontend run ios",
+    "front:web": "npm --prefix frontend run web",
+    "front:typecheck": "npm --prefix frontend run typecheck",
+    "back": "node -e \"const {spawn}=require('child_process');const p=spawn(process.platform==='win32'?'mvnw.cmd':'./mvnw',['spring-boot:run'],{cwd:'backend',stdio:'inherit',shell:true});p.on('exit',c=>process.exit(c??0))\"",
+    "back:test": "node -e \"const {spawn}=require('child_process');const p=spawn(process.platform==='win32'?'mvnw.cmd':'./mvnw',['test'],{cwd:'backend',stdio:'inherit',shell:true});p.on('exit',c=>process.exit(c??0))\""
+  }
 }

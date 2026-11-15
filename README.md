@@ -52,21 +52,21 @@ No mesmo terminal, entre na pasta que acabou de ser criada:
 cd mao_amiga
 ```
 
-**3. Instale as dependências**
-Com o Node.js devidamente instalado, execute o comando a seguir. Ele baixará todos os pacotes e bibliotecas que o projeto utiliza (como o Expo e o React Native):
+**3. Instale as dependências do Frontend**
+Com o Node.js devidamente instalado, execute o comando a seguir na raiz do repositório (ou dentro de `frontend/`). Ele baixará todos os pacotes e bibliotecas que o aplicativo utiliza (como o Expo e o React Native):
 ```bash
-npm install
+npm run install:front
+# ou: cd frontend && npm install
 ```
 
 ### ▶️ Como Rodar a Aplicação
 
 #### 1. Inicie a API Spring Boot (Backend)
-Em um terminal separado:
+Em um terminal na raiz do projeto:
 ```bash
-cd backend
-./mvnw spring-boot:run
+npm run back
 ```
-*(No Windows PowerShell / Prompt: `.\mvnw.cmd spring-boot:run`)*
+*(Ou entrando na pasta `backend`: `./mvnw spring-boot:run` no Linux/macOS ou `.\mvnw.cmd spring-boot:run` no Windows)*
 
 - A API subirá na porta `8080`: `http://localhost:8080/pontos`
 - Console H2: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:institutodb`, Usuário: `sa`, Senha em branco)
@@ -75,9 +75,10 @@ cd backend
   - `GET /pontos/{id}` (detalhe do ponto com retorno 404 se inexistente)
 
 #### 2. Inicie o aplicativo móvel (Frontend)
-No terminal da raiz do projeto:
+Em outro terminal na raiz do projeto:
 ```bash
-npm start
+npm run front
+# ou: cd frontend && npm start
 ```
 Isso iniciará o Metro Bundler e exibirá um **QR Code** no terminal (e possivelmente abrirá uma aba no seu navegador).
 

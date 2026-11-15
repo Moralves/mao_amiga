@@ -10,11 +10,12 @@ Este guia documenta as melhorias arquiteturais e a integração do aplicativo co
 
 ---
 
-## 2. Arquitetura em Camadas (`src/`)
+## 2. Arquitetura do Repositório (`backend/` e `frontend/`)
 
 ```text
 mao_amiga/
-├── backend/                                  # API Spring Boot (projeto separado)
+├── package.json                              # Scripts de atalho na raiz (front, back, install:front)
+├── backend/                                  # API Spring Boot (projeto Java/Maven isolado)
 │   ├── src/main/java/br/com/instituto/
 │   │   ├── config/                           # DataInitializer (carga 8 pontos), WebConfig (CORS)
 │   │   ├── controller/                       # PontoController (GET /pontos, GET /pontos/{id})
@@ -22,28 +23,31 @@ mao_amiga/
 │   │   ├── model/                            # Ponto (JPA Entity)
 │   │   └── repository/                       # PontoRepository (Spring Data JPA)
 │   └── pom.xml                               # Spring Boot 3.4.3, Java 17, H2, Data JPA, Web
-├── App.tsx                                   # Apenas monta a navegação (Native Stack)
-└── src/
-    ├── types/
-    │   ├── ponto.ts                          # Interface Ponto (espelha PontoDTO) e PagedResponse<T>
-    │   ├── doacao.ts                         # Interface Doacao do Projeto N1
-    │   └── navigation.ts                     # RootStackParamList e NativeStackScreenProps
-    ├── services/
-    │   ├── api.ts                            # ÚNICO arquivo que chama fetch (URL base configurada)
-    │   ├── pontosService.ts                  # listarPontos() e buscarPontoPorId()
-    │   ├── storage.ts                        # Funções genéricas lerJSON<T> e salvarJSON<T>
-    │   └── doacoesStorage.ts                 # Persistência de doações no AsyncStorage via storage.ts
-    ├── components/
-    │   ├── PointCard.tsx                     # Card de exibição do ponto vindo da API
-    │   ├── DonationCard.tsx                  # Card de exibição de doação
-    │   └── DonationSummary.tsx               # Resumo dinâmico de doações e quantidades
-    └── screens/
-        ├── ListScreen.tsx                    # Lista pontos da API com tratamento de erro offline
-        ├── DetailScreen.tsx                  # Busca ponto por id e trata 404 (ponto não encontrado)
-        ├── DonationScreen.tsx                # Cadastro de doação com pontos vindos da API
-        ├── PointItemsScreen.tsx              # Itens cadastrados para um ponto específico
-        ├── MyDonationsScreen.tsx             # Histórico geral de doações salvas
-        └── DonationDetailScreen.tsx          # Detalhes e exclusão confirmada de doação
+└── frontend/                                 # Aplicativo Móvel Expo / React Native isolado
+    ├── App.tsx                               # Apenas monta a navegação (Native Stack)
+    ├── package.json                          # Dependências e scripts do Expo
+    ├── tsconfig.json                         # TypeScript strict: true
+    └── src/
+        ├── types/
+        │   ├── ponto.ts                      # Interface Ponto (espelha PontoDTO) e PagedResponse<T>
+        │   ├── doacao.ts                     # Interface Doacao do Projeto N1
+        │   └── navigation.ts                 # RootStackParamList e NativeStackScreenProps
+        ├── services/
+        │   ├── api.ts                        # ÚNICO arquivo que chama fetch (URL base configurada)
+        │   ├── pontosService.ts              # listarPontos() e buscarPontoPorId()
+        │   ├── storage.ts                    # Funções genéricas lerJSON<T> e salvarJSON<T>
+        │   └── doacoesStorage.ts             # Persistência de doações no AsyncStorage via storage.ts
+        ├── components/
+        │   ├── PointCard.tsx                 # Card de exibição do ponto vindo da API
+        │   ├── DonationCard.tsx              # Card de exibição de doação
+        │   └── DonationSummary.tsx           # Resumo dinâmico de doações e quantidades
+        └── screens/
+            ├── ListScreen.tsx                # Lista pontos da API com tratamento de erro offline
+            ├── DetailScreen.tsx              # Busca ponto por id e trata 404 (ponto não encontrado)
+            ├── DonationScreen.tsx            # Cadastro de doação com pontos vindos da API
+            ├── PointItemsScreen.tsx          # Itens cadastrados para um ponto específico
+            ├── MyDonationsScreen.tsx         # Histórico geral de doações salvas
+            └── DonationDetailScreen.tsx      # Detalhes e exclusão confirmada de doação
 ```
 
 ---
