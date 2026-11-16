@@ -132,7 +132,7 @@ class InstitutoApiApplicationTests {
     }
 
     @Test
-    @DisplayName("GET e PUT de id inexistente respondem 404")
+    @DisplayName("GET e PUT de id inexistente respondem 404 em /api/v1/pontos")
     void deveResponder404ParaIdInexistente() throws Exception {
         UUID idInexistente = UUID.randomUUID();
 
@@ -156,7 +156,7 @@ class InstitutoApiApplicationTests {
     }
 
     @Test
-    @DisplayName("Cadastro ou edição com campo obrigatório vazio responde 400")
+    @DisplayName("Cadastro ou edição com campo obrigatório vazio responde 400 em /api/v1/pontos")
     void deveResponder400QuandoCampoObrigatorioVazio() throws Exception {
         String bodyInvalido = """
                 {
@@ -171,6 +171,115 @@ class InstitutoApiApplicationTests {
         mockMvc.perform(post("/api/v1/pontos")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(bodyInvalido))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Fluxo CRUD completo de doações: POST, GET por id, PUT preservando criadoEm, filtro e DELETE")
+    void deveExecutarCrudCompletoDeDoacao() throws Exception {
+        String novaDoacaoJson = """
+                {
+                  "tipoItem": "Cesta Básica",
+                  "quantidade": 5,
+                  "pontoDestino": "Ponto de Coleta Campinas"
+                }
+                """;
+
+        MvcResult postResult = mockMvc.perform(post("/api/v1/doacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(novaDoacaoJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.tipoItem").value("Cesta Básica"))
+                .andExpect(jsonPath("$.quantidade").value(5))
+                .andExpect(jsonPath("$.pontoDestino").value("Ponto de Coleta Campinas"))
+                .andExpect(jsonPath("$.criadoEm", notNullValue()))
+                .andReturn();
+
+        JsonNode criada = objectMapper.readTree(postResult.getResponse().getContentAsString());
+        String id = criada.get("id").asText();
+        String criadoEmOriginal = criada.get("criadoEm").asText();
+
+        mockMvc.perform(get("/api/v1/doacoes/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.tipoItem").value("Cesta Básica"));
+
+        mockMvc.perform(get("/api/v1/doacoes/filtro?filtro=cesta&page=0&size=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].tipoItem").value("Cesta Básica"));
+
+        String edicaoDoacaoJson = """
+                {
+                  "tipoItem": "Cesta Básica Completa",
+                  "quantidade": 8,
+                  "pontoDestino": "Centro de Arrecadação Bueno"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/doacoes/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(edicaoDoacaoJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.tipoItem").value("Cesta Básica Completa"))
+                .andExpect(jsonPath("$.quantidade").value(8))
+                .andExpect(jsonPath("$.pontoDestino").value("Centro de Arrecadação Bueno"))
+                .andExpect(jsonPath("$.criadoEm").value(criadoEmOriginal));
+
+        mockMvc.perform(delete("/api/v1/doacoes/" + id))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/doacoes/" + id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Doações: GET e PUT de id inexistente respondem 404; quantidade <= 0 ou tipo vazio respondem 400")
+    void deveValidarErros400E404EmDoacoes() throws Exception {
+        UUID idInexistente = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/v1/doacoes/" + idInexistente))
+                .andExpect(status().isNotFound());
+
+        String bodyValido = """
+                {
+                  "tipoItem": "Arroz",
+                  "quantidade": 2,
+                  "pontoDestino": "Ponto de Coleta Campinas"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/doacoes/" + idInexistente)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(bodyValido))
+                .andExpect(status().isNotFound());
+
+        String quantidadeZeroJson = """
+                {
+                  "tipoItem": "Arroz",
+                  "quantidade": 0,
+                  "pontoDestino": "Ponto de Coleta Campinas"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/doacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(quantidadeZeroJson))
+                .andExpect(status().isBadRequest());
+
+        String tipoVazioJson = """
+                {
+                  "tipoItem": "",
+                  "quantidade": 3,
+                  "pontoDestino": "Ponto de Coleta Campinas"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/doacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(tipoVazioJson))
                 .andExpect(status().isBadRequest());
     }
 }

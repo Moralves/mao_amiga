@@ -202,6 +202,55 @@ GET http://localhost:8080/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc
 
 ---
 
+## Endpoints de Doações (`[N2-5]`)
+
+| Método | URL Completa | Descrição | Status de Sucesso |
+| :--- | :--- | :--- | :--- |
+| `GET` | `http://localhost:8080/api/v1/doacoes/filtro?filtro=...&page=0&size=10` | Busca paginada por tipo de item (da mais nova para a mais antiga) | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/doacoes/{id}` | Busca uma doação pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
+| `POST` | `http://localhost:8080/api/v1/doacoes` | Cadastra uma doação (`criadoEm` gerado no servidor) | `201 Created` / `400 Bad Request` |
+| `PUT` | `http://localhost:8080/api/v1/doacoes/{id}` | Edita uma doação mantendo `id` e `criadoEm` | `200 OK` / `400` / `404` |
+| `DELETE` | `http://localhost:8080/api/v1/doacoes/{id}` | Exclui uma doação pelo seu `id` | `204 No Content` / `404 Not Found` |
+
+### Exemplos de Requisição e Resposta — Doações (`[N2-5]`)
+
+#### 1. `POST /api/v1/doacoes` (`201 Created`)
+Corpo enviado (`DoacaoRequestDTO`):
+```json
+{
+  "tipoItem": "Cesta Básica",
+  "quantidade": 5,
+  "pontoDestino": "Ponto de Coleta Campinas"
+}
+```
+Resposta (`DoacaoResponseDTO`):
+```json
+{
+  "id": "f901a23b-45c6-48d9-9012-3456789abc01",
+  "tipoItem": "Cesta Básica",
+  "quantidade": 5,
+  "pontoDestino": "Ponto de Coleta Campinas",
+  "criadoEm": "2026-11-16T20:35:00"
+}
+```
+
+#### 2. `GET /api/v1/doacoes/filtro?filtro=cesta&page=0&size=10` (`200 OK`)
+Filtra pelo tipo de item sem diferenciar maiúsculas, ordenando da mais nova para a mais antiga (`sort=criadoEm,desc`).
+
+#### 3. `GET /api/v1/doacoes/{id}` (`200 OK` / `404 Not Found`)
+Retorna o `DoacaoResponseDTO` correspondente ou status `404` caso o `id` não exista.
+
+#### 4. `PUT /api/v1/doacoes/{id}` (`200 OK` / `400` / `404`)
+Atualiza `tipoItem`, `quantidade` e `pontoDestino`, preservando `id` e `criadoEm`.
+
+#### 5. `DELETE /api/v1/doacoes/{id}` (`204 No Content`)
+Remove a doação do banco.
+
+#### 6. Erro de Validação (`400 Bad Request`)
+Quantidade zero (`0`), negativa ou `tipoItem` vazio respondem `400 Bad Request` e não gravam no banco.
+
+---
+
 ## Como Rodar o Aplicativo (`frontend/`)
 
 ```bash
