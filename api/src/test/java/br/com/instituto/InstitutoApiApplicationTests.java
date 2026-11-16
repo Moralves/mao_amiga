@@ -34,12 +34,12 @@ class InstitutoApiApplicationTests {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("GET /api/v1/pontos retorna pelo menos 8 pontos da carga inicial")
+    @DisplayName("GET /api/v1/pontos retorna pelo menos 25 pontos da carga inicial")
     void deveListarPontosIniciais() throws Exception {
         mockMvc.perform(get("/api/v1/pontos")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(8))))
+                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(25))))
                 .andExpect(jsonPath("$[0].id", notNullValue()))
                 .andExpect(jsonPath("$[0].nome", notNullValue()))
                 .andExpect(jsonPath("$[0].endereco", notNullValue()))
@@ -49,11 +49,40 @@ class InstitutoApiApplicationTests {
     }
 
     @Test
+    @DisplayName("GET /api/v1/pontos/filtro devolve paginação padrão de 10 itens no formato content + page")
+    void deveBuscarPontosPaginadosSemFiltro() throws Exception {
+        mockMvc.perform(get("/api/v1/pontos/filtro")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(10)))
+                .andExpect(jsonPath("$.page.size").value(10))
+                .andExpect(jsonPath("$.page.number").value(0))
+                .andExpect(jsonPath("$.page.totalElements", greaterThanOrEqualTo(25)))
+                .andExpect(jsonPath("$.page.totalPages", greaterThanOrEqualTo(3)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/pontos/filtro filtra por nome ou bairro sem diferenciar maiúsculas e aceita paginação")
+    void deveFiltrarPontosPorNomeOuBairroEPaginar() throws Exception {
+        mockMvc.perform(get("/api/v1/pontos/filtro?filtro=bueno&page=0&size=10")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].bairro").value("Setor Bueno"));
+
+        mockMvc.perform(get("/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(10)))
+                .andExpect(jsonPath("$.page.number").value(1));
+    }
+
+    @Test
     @DisplayName("Fluxo CRUD completo: POST, GET por id, PUT e DELETE em /api/v1/pontos")
     void deveExecutarCrudCompletoDePonto() throws Exception {
         String novoPontoJson = """
                 {
-                  "nome": "Ponto Solidário Setor Oeste",
+                  "nome": "Ponto Solidário Setor Oeste Novo",
                   "endereco": "Av. Assis Chateaubriand, 500 - Setor Oeste, Goiânia - GO",
                   "bairro": "Setor Oeste",
                   "horario": "Seg a Sex, 8h às 17h",
@@ -66,7 +95,7 @@ class InstitutoApiApplicationTests {
                 .content(novoPontoJson))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", notNullValue()))
-                .andExpect(jsonPath("$.nome").value("Ponto Solidário Setor Oeste"))
+                .andExpect(jsonPath("$.nome").value("Ponto Solidário Setor Oeste Novo"))
                 .andExpect(jsonPath("$.tipo").value("coleta"))
                 .andReturn();
 

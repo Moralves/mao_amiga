@@ -34,17 +34,18 @@ cd api
 
 ---
 
-## Endpoints de Pontos de Coleta (`[N2-1]`)
+## Endpoints de Pontos de Coleta (`[N2-1]` e `[N2-2]`)
 
 | Método | URL Completa | Descrição | Status de Sucesso |
 | :--- | :--- | :--- | :--- |
 | `GET` | `http://localhost:8080/api/v1/pontos` | Lista todos os pontos cadastrados | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/pontos/filtro?filtro=...&page=0&size=10` | Busca paginada de pontos por nome ou bairro | `200 OK` |
 | `GET` | `http://localhost:8080/api/v1/pontos/{id}` | Busca um ponto pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
 | `POST` | `http://localhost:8080/api/v1/pontos` | Cadastra um novo ponto (campos validados com `@Valid`) | `201 Created` / `400 Bad Request` |
 | `PUT` | `http://localhost:8080/api/v1/pontos/{id}` | Atualiza os dados de um ponto existente | `200 OK` / `400` / `404` |
 | `DELETE` | `http://localhost:8080/api/v1/pontos/{id}` | Remove um ponto pelo seu `id` | `204 No Content` / `404 Not Found` |
 
-### Exemplos de Requisição e Resposta (Swagger)
+### Exemplos de Requisição e Resposta — CRUD (`[N2-1]`)
 
 #### 1. `GET /api/v1/pontos` (`200 OK`)
 Retorna a lista de `PontoResponseDTO` com os pontos da carga inicial em Goiânia:
@@ -105,6 +106,99 @@ Enviando `POST /api/v1/pontos` ou `PUT /api/v1/pontos/{id}` com campo vazio (`"n
 
 #### 7. Recurso Inexistente (`404 Not Found`)
 Consultando `GET /api/v1/pontos/{id}` ou `PUT /api/v1/pontos/{id}` com um UUID que não existe no banco, a API responde com status `404 Not Found`.
+
+---
+
+### Exemplos de Busca Paginada (`[N2-2]`)
+
+#### 1. Chamada sem filtro (padrão: 10 itens ordenados por `nome`)
+**Requisição:**
+```http
+GET http://localhost:8080/api/v1/pontos/filtro
+```
+**Resposta (`200 OK`):**
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d501",
+      "nome": "Base Comunitária Setor Oeste",
+      "endereco": "Av. Assis Chateaubriand, 620 - Setor Oeste, Goiânia - GO",
+      "bairro": "Setor Oeste",
+      "horario": "Seg a Sex, 8h às 18h",
+      "tipo": "coleta"
+    },
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d502",
+      "nome": "Casa da Esperança Marista",
+      "endereco": "Rua 1122, 180 - Setor Marista, Goiânia - GO",
+      "bairro": "Setor Marista",
+      "horario": "Seg a Sex, 8h30 às 17h30",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 25,
+    "totalPages": 3
+  }
+}
+```
+
+#### 2. Chamada filtrando por bairro (insensível a maiúsculas/minúsculas)
+**Requisição:**
+```http
+GET http://localhost:8080/api/v1/pontos/filtro?filtro=bueno&page=0&size=10
+```
+**Resposta (`200 OK`):**
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d503",
+      "nome": "Centro de Arrecadação Bueno",
+      "endereco": "Av. T-4, 1400 - Setor Bueno, Goiânia - GO",
+      "bairro": "Setor Bueno",
+      "horario": "Seg a Sáb, 9h às 19h",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
+
+#### 3. Chamada pedindo a segunda página (`page=1`) e ordenando por bairro (`sort=bairro,asc`)
+**Requisição:**
+```http
+GET http://localhost:8080/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc
+```
+**Resposta (`200 OK`):**
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d511",
+      "nome": "Ponto de Coleta Campinas",
+      "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
+      "bairro": "Setor Campinas",
+      "horario": "Seg a Sex, 8h às 17h",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 1,
+    "totalElements": 25,
+    "totalPages": 3
+  }
+}
+```
 
 ---
 

@@ -4,6 +4,10 @@ import br.com.instituto.dto.PontoRequestDTO;
 import br.com.instituto.dto.PontoResponseDTO;
 import br.com.instituto.service.PontoService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -33,6 +38,14 @@ public class PontoController {
     @GetMapping
     public ResponseEntity<List<PontoResponseDTO>> listar() {
         return ResponseEntity.ok(pontoService.listarTodos());
+    }
+
+    @GetMapping("/filtro")
+    public ResponseEntity<Page<PontoResponseDTO>> filtrar(
+            @RequestParam(required = false) String filtro,
+            @PageableDefault(size = 10, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(pontoService.buscarPaginado(filtro, pageable));
     }
 
     @GetMapping("/{id}")

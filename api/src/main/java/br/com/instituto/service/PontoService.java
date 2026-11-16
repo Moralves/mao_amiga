@@ -4,6 +4,8 @@ import br.com.instituto.dto.PontoRequestDTO;
 import br.com.instituto.dto.PontoResponseDTO;
 import br.com.instituto.entity.Ponto;
 import br.com.instituto.repository.PontoRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,6 +27,12 @@ public class PontoService {
                 .stream()
                 .map(PontoResponseDTO::fromEntity)
                 .toList();
+    }
+
+    public Page<PontoResponseDTO> buscarPaginado(String filtro, Pageable pageable) {
+        String termo = (filtro == null || filtro.isBlank()) ? null : filtro.trim();
+        return pontoRepository.buscarPorFiltro(termo, pageable)
+                .map(PontoResponseDTO::fromEntity);
     }
 
     public PontoResponseDTO buscarPorId(UUID id) {
