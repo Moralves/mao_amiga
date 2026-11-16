@@ -13,7 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Doacao } from '../types/doacao';
 import { Ponto } from '../types/ponto';
-import { listarDoacoes } from '../services/doacoesStorage';
+import { listarPagina } from '../services/doacoesService';
 import { theme } from '../styles/theme';
 
 export interface PointItemsScreenCustomProps {
@@ -36,37 +36,31 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({
   onOpenDonation,
   onSelectDonation,
 }) => {
-  const pontoId = route?.params?.pontoId ?? point?.id;
   const pontoNome = route?.params?.pontoNome ?? point?.nome ?? 'Ponto de Coleta';
 
   const [items, setItems] = useState<Doacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [reloadCount, setReloadCount] = useState(0);
 
   const carregarItens = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const saved = await listarDoacoes();
-      const filtrados = saved
-        .filter(
-          (item) =>
-            item.pontoDestino === pontoNome ||
-            (pontoId !== undefined && item.pontoDestino === String(pontoId))
-        )
-        .reverse();
+      const pagina = await listarPagina('', 0, 50);
+      const filtrados = (pagina.content || []).filter(
+        (item) => item.pontoDestino === pontoNome
+      );
       setItems(filtrados);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [pontoNome, pontoId]);
+  }, [pontoNome]);
 
   useEffect(() => {
     carregarItens();
-  }, [carregarItens, reloadCount]);
+  }, [carregarItens]);
 
   const handleBack = () => {
     if (onBack) {
@@ -118,10 +112,10 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({
         ) : error ? (
           <View style={styles.messageBox}>
             <Text style={styles.message}>
-              Não foi possível carregar os itens salvos neste dispositivo.
+              Não foi possível carregar os itens deste ponto na API.
             </Text>
             <Pressable
-              onPress={() => setReloadCount((count) => count + 1)}
+              onPress={carregarItens}
               accessibilityRole="button"
               style={styles.button}
             >
@@ -145,7 +139,7 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({
                   Cadastrado em {new Date(item.criadoEm).toLocaleString('pt-BR')}
                 </Text>
                 <Text style={styles.cardActionText}>
-                  Toque para ver detalhes ou excluir →
+                  Toque para ver detalhes →
                 </Text>
               </Pressable>
             )}

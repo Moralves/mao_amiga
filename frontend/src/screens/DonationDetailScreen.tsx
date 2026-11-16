@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Doacao } from '../types/doacao';
-import { excluirDoacao } from '../services/doacoesStorage';
+import { excluir } from '../services/doacoesService';
 import { theme } from '../styles/theme';
 
 export interface DonationDetailCustomProps {
@@ -88,7 +88,7 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
 
     try {
       setIsDeleting(true);
-      await excluirDoacao(donation.id);
+      await excluir(donation.id);
 
       if (onDeleteSuccess) {
         onDeleteSuccess();

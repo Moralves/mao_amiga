@@ -1,10 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -19,15 +17,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
-import { listarPontos } from '../services/pontosService';
-import { salvarDoacao } from '../services/doacoesStorage';
+import { listar } from '../services/pontosService';
+import { cadastrar } from '../services/doacoesService';
 import { theme } from '../styles/theme';
 
 export interface DonationScreenCustomProps {
   point?: Ponto | null;
   onBack?: () => void;
   onSaved?: () => void;
-  onSelectPoint?: (point: Ponto) => void;
 }
 
 export type DonationScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'Donation'>> &
@@ -39,10 +36,9 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
   point: initialPoint,
   onBack,
   onSaved,
-  onSelectPoint,
 }) => {
   const pontoInicial = route?.params?.ponto ?? initialPoint ?? null;
-  const [selectedPoint, setSelectedPoint] = useState<Ponto | null>(pontoInicial);
+  const [selectedPointName, setSelectedPointName] = useState<string>(pontoInicial?.nome ?? '');
   const [availablePoints, setAvailablePoints] = useState<Ponto[]>([]);
   const [loadingPoints, setLoadingPoints] = useState(false);
   const [pointsError, setPointsError] = useState<string | null>(null);
@@ -52,23 +48,22 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
   const [errors, setErrors] = useState({ itemType: '', quantity: '', point: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    if (pontoInicial) {
-      setSelectedPoint(pontoInicial);
+    if (pontoInicial?.nome) {
+      setSelectedPointName(pontoInicial.nome);
     }
   }, [pontoInicial]);
 
-  // Carrega pontos da API para a seleção de destino
+  // Carrega os pontos da API (GET /api/v1/pontos) para escolha do destino
   const carregarPontosApi = useCallback(async () => {
     setLoadingPoints(true);
     setPointsError(null);
     try {
-      const lista = await listarPontos();
+      const lista = await listar();
       setAvailablePoints(lista || []);
     } catch {
-      setPointsError('Não foi possível obter a lista de pontos da API.');
+      setPointsError('Não foi possível carregar os pontos de destino da API.');
     } finally {
       setLoadingPoints(false);
     }
@@ -97,16 +92,9 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setErrors((current) => ({ ...current, quantity: '' }));
   };
 
-  const handleSelectPointItem = (item: Ponto) => {
-    setSelectedPoint(item);
-    onSelectPoint?.(item);
-    setErrors((current) => ({ ...current, point: '' }));
-    setSaveError('');
-    setModalVisible(false);
-  };
-
   const handleSave = async () => {
     if (saving) return;
+
     const nextErrors = {
       itemType: itemType.trim() ? '' : 'Informe o tipo do item.',
       quantity: !quantity
@@ -114,49 +102,41 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
         : Number(quantity) <= 0
         ? 'Informe uma quantidade maior que zero.'
         : '',
-      point: selectedPoint ? '' : 'Selecione o ponto de destino.',
+      point: selectedPointName.trim() ? '' : 'Selecione o ponto de destino.',
     };
-    const isValid = !Object.values(nextErrors).some(Boolean);
+
     setErrors(nextErrors);
+    const isValid = !Object.values(nextErrors).some(Boolean);
     if (!isValid) {
-      if (!selectedPoint) {
-        setModalVisible(true);
-      }
       return;
     }
-
-    if (!selectedPoint) return;
 
     Keyboard.dismiss();
     setSaveError('');
     setSaving(true);
+
     try {
-      await salvarDoacao({
+      await cadastrar({
         tipoItem: itemType.trim(),
         quantidade: Number(quantity),
-        pontoDestino: selectedPoint.nome,
+        pontoDestino: selectedPointName.trim(),
       });
 
       if (onSaved) {
         onSaved();
       } else if (navigation?.navigate) {
         const returnScreen = route?.params?.returnScreen;
-        if (returnScreen === 'MyDonations') {
-          navigation.navigate('MyDonations');
-        } else if (returnScreen === 'PointItems') {
-          navigation.navigate('PointItems', {
-            pontoId: selectedPoint.id,
-            pontoNome: selectedPoint.nome,
-          });
+        if (returnScreen === 'MyDonations' && navigation.goBack) {
+          navigation.goBack();
         } else {
-          navigation.navigate('PointItems', {
-            pontoId: selectedPoint.id,
-            pontoNome: selectedPoint.nome,
-          });
+          navigation.navigate('MyDonations');
         }
       }
-    } catch {
-      setSaveError('Não foi possível salvar a doação neste dispositivo. Tente novamente.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao salvar na API';
+      setSaveError(
+        `Não foi possível registrar a doação (${msg}). Verifique os dados ou se a API está ligada.`
+      );
     } finally {
       setSaving(false);
     }
@@ -185,42 +165,8 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
           >
             <Text style={styles.title}>Registrar Doação</Text>
             <Text style={styles.subtitle}>
-              Preencha os dados abaixo para registrar os mantimentos entregues:
+              Preencha os dados abaixo para registrar a doação na API:
             </Text>
-
-            {/* Ponto de destino selector */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Ponto de Destino *</Text>
-              <Pressable
-                onPress={() => setModalVisible(true)}
-                style={[styles.pointSelectorButton, !!errors.point && styles.inputError]}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  selectedPoint
-                    ? `Ponto selecionado: ${selectedPoint.nome}. Toque para alterar.`
-                    : 'Toque para escolher o ponto de destino da doação.'
-                }
-              >
-                {selectedPoint ? (
-                  <View style={styles.selectedPointContent}>
-                    <View style={styles.selectedPointHeader}>
-                      <Text style={styles.selectedPointName}>{selectedPoint.nome}</Text>
-                      <View style={styles.selectedPointBadge}>
-                        <Text style={styles.selectedPointBadgeText}>{selectedPoint.tipo}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.selectedPointAddress}>📍 {selectedPoint.endereco}</Text>
-                    <Text style={styles.changePointText}>Toque para alterar o ponto</Text>
-                  </View>
-                ) : (
-                  <View style={styles.placeholderRow}>
-                    <Text style={styles.selectorPlaceholder}>Selecione o ponto de destino...</Text>
-                    <Text style={styles.selectorChevron}>▼</Text>
-                  </View>
-                )}
-              </Pressable>
-              {!!errors.point && <Text style={styles.errorText}>{errors.point}</Text>}
-            </View>
 
             {/* Tipo do Item */}
             <View style={styles.fieldContainer}>
@@ -253,13 +199,84 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               {!!errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
             </View>
 
+            {/* Ponto de destino escolhido entre os pontos da API (GET /api/v1/pontos) com um TouchableOpacity por ponto */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Ponto de Destino *</Text>
+              {loadingPoints ? (
+                <View style={styles.pointsStateBox}>
+                  <ActivityIndicator size="small" color={theme.colors.primaryDark} />
+                  <Text style={styles.pointsStateText}>Carregando pontos da API...</Text>
+                </View>
+              ) : pointsError ? (
+                <View style={styles.pointsStateBox}>
+                  <Text style={styles.errorText}>{pointsError}</Text>
+                  <TouchableOpacity style={styles.retryPointsButton} onPress={carregarPontosApi}>
+                    <Text style={styles.retryPointsText}>Tentar novamente</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.pointsOptionsList}>
+                  {availablePoints.map((ponto) => {
+                    const isSelected = selectedPointName === ponto.nome;
+                    return (
+                      <TouchableOpacity
+                        key={ponto.id}
+                        activeOpacity={0.75}
+                        onPress={() => {
+                          setSelectedPointName(ponto.nome);
+                          setErrors((current) => ({ ...current, point: '' }));
+                          setSaveError('');
+                        }}
+                        style={[
+                          styles.pointOptionButton,
+                          isSelected && styles.pointOptionButtonSelected,
+                          !!errors.point && !selectedPointName && styles.inputError,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <View style={styles.pointOptionHeader}>
+                          <Text
+                            style={[
+                              styles.pointOptionName,
+                              isSelected && styles.pointOptionNameSelected,
+                            ]}
+                          >
+                            {ponto.nome}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.pointOptionType,
+                              isSelected && styles.pointOptionTypeSelected,
+                            ]}
+                          >
+                            {ponto.tipo}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.pointOptionBairro,
+                            isSelected && styles.pointOptionBairroSelected,
+                          ]}
+                        >
+                          📍 {ponto.bairro} — {ponto.horario}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+              {!!errors.point && <Text style={styles.errorText}>{errors.point}</Text>}
+            </View>
+
             {!!saveError && (
-              <Text style={styles.errorText} accessibilityRole="alert">
-                {saveError}
-              </Text>
+              <View style={styles.apiErrorBanner} accessibilityRole="alert">
+                <Text style={styles.apiErrorText}>{saveError}</Text>
+              </View>
             )}
 
-            <Pressable
+            <TouchableOpacity
+              activeOpacity={0.8}
               style={styles.validateButton}
               onPress={handleSave}
               disabled={saving}
@@ -269,105 +286,10 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               <Text style={styles.validateButtonText}>
                 {saving ? 'Salvando...' : 'Salvar doação'}
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-
-      {/* Modal para seleção dos pontos vindos da API */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTextWrapper}>
-                <Text style={styles.modalTitle}>Escolha o ponto de destino</Text>
-                <Text style={styles.modalSubtitle}>
-                  Selecione um ponto de coleta da API:
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Fechar seleção de pontos"
-                style={styles.modalCloseButton}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loadingPoints ? (
-              <View style={styles.modalLoadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primaryDark} />
-                <Text style={styles.modalLoadingText}>Carregando pontos da API...</Text>
-              </View>
-            ) : pointsError ? (
-              <View style={styles.modalLoadingContainer}>
-                <Text style={styles.errorText}>{pointsError}</Text>
-                <TouchableOpacity style={styles.modalRetryButton} onPress={carregarPontosApi}>
-                  <Text style={styles.modalRetryButtonText}>Recarregar</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <FlatList
-                data={availablePoints}
-                keyExtractor={(item) => String(item.id)}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.modalListContent}
-                renderItem={({ item }) => {
-                  const isSelected = selectedPoint?.id === item.id;
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectPointItem(item)}
-                      style={[
-                        styles.modalPointCard,
-                        isSelected && styles.modalPointCardSelected,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Selecionar ${item.nome}`}
-                    >
-                      <View style={styles.modalPointHeader}>
-                        <Text
-                          style={[
-                            styles.modalPointTitle,
-                            isSelected && styles.modalPointTitleSelected,
-                          ]}
-                        >
-                          {item.nome}
-                        </Text>
-                        <View
-                          style={[styles.modalBadge, isSelected && styles.modalBadgeSelected]}
-                        >
-                          <Text
-                            style={[
-                              styles.modalBadgeText,
-                              isSelected && styles.modalBadgeTextSelected,
-                            ]}
-                          >
-                            {item.tipo}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.modalPointAddress}>📍 {item.endereco}</Text>
-                      <Text style={styles.modalPointHours}>⏰ {item.horario}</Text>
-                      {isSelected && (
-                        <View style={styles.selectedBanner}>
-                          <Text style={styles.selectedBannerText}>✓ Ponto selecionado</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -400,7 +322,11 @@ const styles = StyleSheet.create({
   },
   scrollView: { flex: 1 },
   scrollContent: {
-    padding: theme.spacing.lg,
+    width: theme.layout.contentWidth,
+    maxWidth: theme.layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingVertical: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
   },
   title: {
     fontSize: 24,
@@ -441,62 +367,88 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
-  pointSelectorButton: {
+  pointsStateBox: {
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  pointsStateText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  retryPointsButton: {
+    backgroundColor: theme.colors.primaryDark,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+  },
+  retryPointsText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pointsOptionsList: {
+    gap: theme.spacing.sm,
+  },
+  pointOptionButton: {
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.spacing.md,
   },
-  placeholderRow: {
+  pointOptionButtonSelected: {
+    backgroundColor: theme.colors.primaryDark,
+    borderColor: theme.colors.primaryDark,
+  },
+  pointOptionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    marginBottom: 4,
   },
-  selectorPlaceholder: {
+  pointOptionName: {
     fontSize: 15,
-    color: theme.colors.textMuted,
-  },
-  selectorChevron: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-  },
-  selectedPointContent: {
-    gap: 4,
-  },
-  selectedPointHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedPointName: {
-    fontSize: 16,
     fontWeight: '700',
     color: theme.colors.textMain,
     flex: 1,
-    marginRight: 8,
+    marginRight: theme.spacing.sm,
   },
-  selectedPointBadge: {
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
+  pointOptionNameSelected: {
+    color: '#FFFFFF',
   },
-  selectedPointBadgeText: {
+  pointOptionType: {
     fontSize: 11,
     fontWeight: '700',
     color: theme.colors.primaryDark,
+    textTransform: 'uppercase',
   },
-  selectedPointAddress: {
+  pointOptionTypeSelected: {
+    color: theme.colors.primaryLight,
+  },
+  pointOptionBairro: {
     fontSize: 13,
     color: theme.colors.textSecondary,
   },
-  changePointText: {
-    fontSize: 12,
+  pointOptionBairroSelected: {
+    color: '#E2E8F0',
+  },
+  apiErrorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.xs,
+  },
+  apiErrorText: {
+    color: '#991B1B',
+    fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.primaryDark,
-    marginTop: 4,
   },
   validateButton: {
     backgroundColor: theme.colors.primaryDark,
@@ -510,133 +462,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: theme.colors.cardBg,
-    borderTopLeftRadius: theme.borderRadius.lg,
-    borderTopRightRadius: theme.borderRadius.lg,
-    maxHeight: '80%',
-    padding: theme.spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: theme.spacing.md,
-  },
-  modalHeaderTextWrapper: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: theme.colors.textMain,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
-  modalCloseButton: {
-    padding: theme.spacing.xs,
-  },
-  modalCloseText: {
-    fontSize: 18,
-    color: theme.colors.textSecondary,
-    fontWeight: 'bold',
-  },
-  modalLoadingContainer: {
-    padding: theme.spacing.xxl,
-    alignItems: 'center',
-  },
-  modalLoadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  modalRetryButton: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.primaryDark,
-    borderRadius: theme.borderRadius.sm,
-  },
-  modalRetryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  modalListContent: {
-    paddingBottom: theme.spacing.xl,
-  },
-  modalPointCard: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  modalPointCardSelected: {
-    borderColor: theme.colors.primaryDark,
-    backgroundColor: theme.colors.primaryLight,
-  },
-  modalPointHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  modalPointTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.textMain,
-    flex: 1,
-  },
-  modalPointTitleSelected: {
-    color: theme.colors.primaryDark,
-  },
-  modalBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: '#E2E8F0',
-  },
-  modalBadgeSelected: {
-    backgroundColor: theme.colors.primaryDark,
-  },
-  modalBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  modalBadgeTextSelected: {
-    color: '#FFFFFF',
-  },
-  modalPointAddress: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginBottom: 2,
-  },
-  modalPointHours: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-  selectedBanner: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.primaryDark,
-  },
-  selectedBannerText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.primaryDark,
   },
 });
