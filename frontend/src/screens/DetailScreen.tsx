@@ -9,13 +9,14 @@ import {
   Linking,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
 import { ApiError } from '../services/api';
-import { buscarPorId } from '../services/pontosService';
+import { buscarPorId, excluir } from '../services/pontosService';
 import { theme } from '../styles/theme';
 
 export interface DetailScreenCustomProps {
@@ -41,6 +42,8 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   const [loading, setLoading] = useState<boolean>(!!pontoId);
   const [notFound, setNotFound] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const carregarPonto = useCallback(async () => {
     if (!pontoId) {
@@ -71,11 +74,67 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     carregarPonto();
   }, [carregarPonto]);
 
+  // Atualiza os dados do detalhe ao voltar da edição
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      carregarPonto();
+    });
+    return unsubscribe;
+  }, [navigation, carregarPonto]);
+
   const handleBack = () => {
     if (onBack) {
       onBack();
     } else if (navigation?.goBack) {
       navigation.goBack();
+    }
+  };
+
+  const handleEditPoint = () => {
+    if (navigation?.navigate && point) {
+      navigation.navigate('PointForm', { ponto: point });
+    }
+  };
+
+  const executarExclusao = async () => {
+    if (!point?.id || deleting) return;
+
+    setActionError(null);
+    setDeleting(true);
+    try {
+      await excluir(point.id);
+      handleBack();
+    } catch (err) {
+      setDeleting(false);
+      const msg = err instanceof Error ? err.message : 'Falha na comunicação com a API';
+      const textoErro = `Não foi possível excluir o ponto (${msg}). Verifique se a API está ligada.`;
+      setActionError(textoErro);
+      Alert.alert('Erro ao excluir', textoErro);
+    }
+  };
+
+  const handleDeletePoint = () => {
+    if (!point?.id || deleting) return;
+
+    Alert.alert(
+      'Excluir ponto',
+      `Deseja realmente excluir o ponto "${point.nome}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: executarExclusao,
+        },
+      ]
+    );
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      const confirmou = window.confirm(`Deseja realmente excluir o ponto "${point.nome}"?`);
+      if (confirmou) {
+        executarExclusao();
+      }
     }
   };
 
@@ -209,7 +268,22 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           </View>
         </View>
 
+        {!!actionError && (
+          <View style={styles.actionErrorBanner} accessibilityRole="alert">
+            <Text style={styles.actionErrorText}>{actionError}</Text>
+          </View>
+        )}
+
         <View style={styles.actionContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleOpenDonation}
+            style={styles.primaryButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.primaryButtonText}>Cadastrar doação neste ponto</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleOpenPointItems}
@@ -221,15 +295,32 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={handleOpenDonation}
-            style={styles.primaryButton}
+            onPress={handleEditPoint}
+            style={styles.outlineButton}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>Cadastrar doação neste ponto</Text>
+            <Text style={styles.outlineButtonText}>Editar ponto</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.8} onPress={handleRoute} style={styles.outlineButton}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleRoute}
+            style={styles.outlineButton}
+            accessibilityRole="button"
+          >
             <Text style={styles.outlineButtonText}>Como Chegar (Mapas)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleDeletePoint}
+            disabled={deleting}
+            style={styles.deleteButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.deleteButtonText}>
+              {deleting ? 'Excluindo...' : 'Excluir ponto'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -327,6 +418,20 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F1F5F9',
   },
+  actionErrorBanner: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: '#FEE2E2',
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  actionErrorText: {
+    color: '#991B1B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   actionContainer: {
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.sm,
@@ -373,6 +478,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -392,7 +509,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: theme.colors.textMain,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   notFoundSubtitle: {
     fontSize: 14,

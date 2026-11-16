@@ -20,6 +20,7 @@ import { theme } from '../styles/theme';
 export interface ListScreenCustomProps {
   onSelectPoint?: (point: Ponto) => void;
   onOpenMyDonations?: () => void;
+  onOpenNewPoint?: () => void;
 }
 
 export type ListScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'List'>> &
@@ -31,6 +32,7 @@ export const ListScreen: React.FC<ListScreenProps> = ({
   navigation,
   onSelectPoint,
   onOpenMyDonations,
+  onOpenNewPoint,
 }) => {
   const [pontos, setPontos] = useState<Ponto[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +45,8 @@ export const ListScreen: React.FC<ListScreenProps> = ({
   const carregandoRef = useRef(false);
   const paginasCarregadasRef = useRef<Set<number>>(new Set());
   const requisicaoIdRef = useRef(0);
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
 
   const carregarPagina = useCallback(
     async (paginaAlvo: number, termoBusca: string, substituir: boolean) => {
@@ -109,6 +113,15 @@ export const ListScreen: React.FC<ListScreenProps> = ({
     carregarPagina(0, searchQuery, true);
   }, [searchQuery, carregarPagina]);
 
+  // Atualiza a lista ao voltar do cadastro, edição ou exclusão de ponto sem fechar o app
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      carregarPagina(0, searchQueryRef.current, true);
+    });
+    return unsubscribe;
+  }, [navigation, carregarPagina]);
+
   const handleLoadMore = () => {
     if (loading || loadingMore || errorMessage) {
       return;
@@ -141,6 +154,15 @@ export const ListScreen: React.FC<ListScreenProps> = ({
     }
   };
 
+  const handleOpenNewPoint = () => {
+    if (onOpenNewPoint) {
+      onOpenNewPoint();
+    }
+    if (navigation?.navigate) {
+      navigation.navigate('PointForm');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
@@ -152,15 +174,27 @@ export const ListScreen: React.FC<ListScreenProps> = ({
               <Text style={styles.logoTitle}>Mão Amiga</Text>
               <Text style={styles.logoSubtitle}>Encontre pontos de coleta e distribuição</Text>
             </View>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleOpenMyDonations}
-              style={styles.myDonationsButton}
-              accessibilityRole="button"
-              accessibilityLabel="Minhas doações"
-            >
-              <Text style={styles.myDonationsButtonText}>Minhas doações</Text>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleOpenNewPoint}
+                style={styles.newPointButton}
+                accessibilityRole="button"
+                accessibilityLabel="Cadastrar novo ponto"
+              >
+                <Text style={styles.newPointButtonText}>+ Novo ponto</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleOpenMyDonations}
+                style={styles.myDonationsButton}
+                accessibilityRole="button"
+                accessibilityLabel="Minhas doações"
+              >
+                <Text style={styles.myDonationsButtonText}>Minhas doações</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -273,7 +307,13 @@ const styles = StyleSheet.create({
   },
   headerTitles: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    flexWrap: 'wrap',
   },
   logoTitle: {
     fontSize: 28,
@@ -285,6 +325,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  newPointButton: {
+    backgroundColor: theme.colors.primaryDark,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+  },
+  newPointButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   myDonationsButton: {
     backgroundColor: theme.colors.primaryLight,
