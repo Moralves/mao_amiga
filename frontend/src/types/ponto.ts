@@ -1,15 +1,18 @@
 export interface Ponto {
-  id: number;
+  id: string;
   nome: string;
   endereco: string;
   bairro: string;
-  horarioFuncionamento: string;
+  horario: string;
   tipo: string;
-  itens: string;
-  telefone: string;
-  descricao: string;
-  latitude: number;
-  longitude: number;
+}
+
+export interface PontoInput {
+  nome: string;
+  endereco: string;
+  bairro: string;
+  horario: string;
+  tipo: string;
 }
 
 export interface PagedResponse<T> {

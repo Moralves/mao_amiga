@@ -10,22 +10,22 @@ interface PointCardProps {
 
 export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
   const getTipoStyles = (tipo: string) => {
-    const t = tipo.toUpperCase();
-    if (t.includes('RECEBE')) {
+    const t = tipo.toLowerCase();
+    if (t.includes('coleta')) {
       return {
-        bg: theme.colors.secondaryLight,
-        text: theme.colors.secondaryText,
+        bg: theme.colors.primaryLight,
+        text: theme.colors.primaryText,
       };
     }
-    if (t.includes('DISTRIBUI')) {
+    if (t.includes('distribui')) {
       return {
         bg: '#FEF3C7',
         text: '#92400E',
       };
     }
     return {
-      bg: theme.colors.primaryLight,
-      text: theme.colors.primaryText,
+      bg: theme.colors.secondaryLight,
+      text: theme.colors.secondaryText,
     };
   };
 
@@ -42,9 +42,7 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
       accessibilityLabel={`Ver detalhes do ponto ${point.nome}`}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.title}>
-          {point.nome}
-        </Text>
+        <Text style={styles.title}>{point.nome}</Text>
         <View style={[styles.badge, { backgroundColor: tipoStyle.bg }]}>
           <Text style={[styles.badgeText, { color: tipoStyle.text }]}>
             {point.tipo}
@@ -52,17 +50,15 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
         </View>
       </View>
 
-      <Text style={styles.bairroText}>
-        📍 {point.bairro}
-      </Text>
+      <Text style={styles.bairroText}>📍 {point.bairro}</Text>
 
-      <Text style={styles.description} numberOfLines={2}>
-        {point.descricao || point.itens}
+      <Text style={styles.addressText} numberOfLines={2}>
+        {point.endereco}
       </Text>
 
       <View style={styles.cardFooter}>
         <Text style={styles.hoursText} numberOfLines={1}>
-          🕒 {point.horarioFuncionamento}
+          🕒 {point.horario}
         </Text>
         <Text style={styles.arrowIcon}>Ver detalhes →</Text>
       </View>
@@ -111,7 +107,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    textAlign: 'right',
+    textTransform: 'uppercase',
   },
   bairroText: {
     fontSize: 13,
@@ -119,7 +115,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     marginBottom: theme.spacing.xs,
   },
-  description: {
+  addressText: {
     fontSize: 14,
     color: theme.colors.textSecondary,
     lineHeight: 20,

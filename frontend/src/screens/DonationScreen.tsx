@@ -65,8 +65,8 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setLoadingPoints(true);
     setPointsError(null);
     try {
-      const response = await listarPontos({ size: 50 });
-      setAvailablePoints(response.content || []);
+      const lista = await listarPontos();
+      setAvailablePoints(lista || []);
     } catch {
       setPointsError('Não foi possível obter a lista de pontos da API.');
     } finally {
@@ -354,7 +354,7 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
                         </View>
                       </View>
                       <Text style={styles.modalPointAddress}>📍 {item.endereco}</Text>
-                      <Text style={styles.modalPointHours}>⏰ {item.horarioFuncionamento}</Text>
+                      <Text style={styles.modalPointHours}>⏰ {item.horario}</Text>
                       {isSelected && (
                         <View style={styles.selectedBanner}>
                           <Text style={styles.selectedBannerText}>✓ Ponto selecionado</Text>

@@ -209,4 +209,5 @@ cd frontend
 npm install
 npx expo start
 ```
-- Pressione `w` para abrir no navegador ou escaneie o QR Code no aplicativo **Expo Go**.
+- **Teste no Navegador:** Os testes de integração com a API foram realizados no navegador pressionando `w` no terminal do Expo (`http://localhost:8080` configurado em `frontend/src/services/api.ts`).
+- **Teste no Celular pela Rede Local:** Ao testar no celular físico via Expo Go, edite a constante `API_BASE_URL` em `frontend/src/services/api.ts` trocando `localhost` pelo IP local do computador na mesma rede Wi-Fi (ex.: `http://192.168.1.15:8080`).

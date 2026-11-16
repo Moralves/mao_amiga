@@ -14,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
-import { buscarPontoPorId } from '../services/pontosService';
+import { ApiError } from '../services/api';
+import { buscarPorId } from '../services/pontosService';
 import { theme } from '../styles/theme';
 
 export interface DetailScreenCustomProps {
@@ -35,11 +36,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
   onOpenDonation,
   onOpenPointItems,
 }) => {
-  const pontoId = route?.params?.pontoId ?? initialPoint?.id;
-  const [point, setPoint] = useState<Ponto | null>(
-    route?.params?.ponto || initialPoint || null
-  );
-  const [loading, setLoading] = useState<boolean>(!point && !!pontoId);
+  const pontoId = route?.params?.id ?? initialPoint?.id;
+  const [point, setPoint] = useState<Ponto | null>(initialPoint || null);
+  const [loading, setLoading] = useState<boolean>(!!pontoId);
   const [notFound, setNotFound] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -54,25 +53,23 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     setNotFound(false);
     setErrorMessage(null);
     try {
-      const data = await buscarPontoPorId(pontoId);
-      if (!data) {
+      const data = await buscarPorId(pontoId);
+      setPoint(data);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
         setNotFound(true);
       } else {
-        setPoint(data);
+        const msg = err instanceof Error ? err.message : 'Erro ao carregar detalhes';
+        setErrorMessage(msg);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao carregar detalhes';
-      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
   }, [pontoId]);
 
   useEffect(() => {
-    if (pontoId) {
-      carregarPonto();
-    }
-  }, [pontoId, carregarPonto]);
+    carregarPonto();
+  }, [carregarPonto]);
 
   const handleBack = () => {
     if (onBack) {
@@ -98,17 +95,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     }
   };
 
-  const handleCall = () => {
-    if (!point?.telefone) return;
-    const cleanPhone = point.telefone.replace(/[^0-9]/g, '');
-    Linking.openURL(`tel:${cleanPhone}`).catch(() => {
-      Alert.alert('Erro', 'Não foi possível iniciar a ligação neste dispositivo.');
-    });
-  };
-
   const handleRoute = () => {
     if (!point) return;
-    const query = encodeURIComponent(point.endereco || `${point.latitude},${point.longitude}`);
+    const query = encodeURIComponent(point.endereco);
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`).catch(() => {
       Alert.alert('Erro', 'Não foi possível abrir o aplicativo de mapas.');
     });
@@ -137,7 +126,7 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
           <Text style={styles.notFoundIcon}>🔍</Text>
           <Text style={styles.notFoundTitle}>Ponto não encontrado</Text>
           <Text style={styles.notFoundSubtitle}>
-            O ponto de coleta solicitado não existe ou foi removido do sistema (código 404).
+            O ponto solicitado não existe ou foi removido (ponto não encontrado - 404).
           </Text>
           <TouchableOpacity style={styles.primaryButton} onPress={handleBack} activeOpacity={0.8}>
             <Text style={styles.primaryButtonText}>Voltar para a lista</Text>
@@ -158,8 +147,14 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
         <View style={styles.centerContainer}>
           <Text style={styles.notFoundIcon}>⚠️</Text>
           <Text style={styles.notFoundTitle}>Erro ao buscar ponto</Text>
-          <Text style={styles.notFoundSubtitle}>{errorMessage || 'Não foi possível carregar os dados.'}</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={carregarPonto} activeOpacity={0.8}>
+          <Text style={styles.notFoundSubtitle}>
+            {errorMessage || 'Não foi possível carregar os dados.'}
+          </Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={carregarPonto}
+            activeOpacity={0.8}
+          >
             <Text style={styles.primaryButtonText}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
@@ -171,7 +166,6 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={handleBack} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Voltar</Text>
@@ -180,29 +174,11 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Title Section */}
         <View style={styles.titleSection}>
           <Text style={styles.title}>{point.nome}</Text>
           <Text style={styles.bairroSubtitle}>📍 {point.bairro}</Text>
         </View>
 
-        {/* Description Section */}
-        {point.descricao ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Sobre o Ponto</Text>
-            <Text style={styles.descriptionText}>{point.descricao}</Text>
-          </View>
-        ) : null}
-
-        {/* Accepted Items / What it receives or distributes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>O que o ponto recebe ou distribui</Text>
-          <View style={styles.itensCard}>
-            <Text style={styles.itensText}>{point.itens}</Text>
-          </View>
-        </View>
-
-        {/* Info Grid (Address, Hours, Phone) */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>📍</Text>
@@ -218,25 +194,21 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             <Text style={styles.infoIcon}>⏰</Text>
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Horário de Funcionamento</Text>
-              <Text style={styles.infoValue}>{point.horarioFuncionamento}</Text>
+              <Text style={styles.infoValue}>{point.horario}</Text>
             </View>
           </View>
 
-          {point.telefone ? (
-            <>
-              <View style={styles.infoRowSeparator} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>📞</Text>
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Telefone / Contato</Text>
-                  <Text style={styles.infoValue}>{point.telefone}</Text>
-                </View>
-              </View>
-            </>
-          ) : null}
+          <View style={styles.infoRowSeparator} />
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>🏷️</Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoLabel}>Tipo do Ponto</Text>
+              <Text style={styles.infoValue}>{point.tipo}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionContainer}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -256,23 +228,9 @@ export const DetailScreen: React.FC<DetailScreenProps> = ({
             <Text style={styles.primaryButtonText}>Cadastrar doação neste ponto</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleRoute}
-            style={styles.outlineButton}
-          >
+          <TouchableOpacity activeOpacity={0.8} onPress={handleRoute} style={styles.outlineButton}>
             <Text style={styles.outlineButtonText}>Como Chegar (Mapas)</Text>
           </TouchableOpacity>
-
-          {point.telefone ? (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleCall}
-              style={styles.outlineButton}
-            >
-              <Text style={styles.outlineButtonText}>Ligar para o Ponto</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -310,6 +268,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     borderRadius: theme.borderRadius.round,
+    textTransform: 'uppercase',
   },
   scrollContent: {
     paddingBottom: theme.spacing.xxl,
@@ -330,33 +289,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.primaryDark,
-  },
-  section: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.textMain,
-    marginBottom: theme.spacing.sm,
-  },
-  descriptionText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: theme.colors.textSecondary,
-  },
-  itensCard: {
-    backgroundColor: theme.colors.cardBg,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  itensText: {
-    fontSize: 14,
-    color: theme.colors.textMain,
-    lineHeight: 20,
   },
   infoCard: {
     margin: theme.spacing.lg,
@@ -403,6 +335,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: theme.colors.primaryDark,
     paddingVertical: 14,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',

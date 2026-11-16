@@ -4,9 +4,9 @@ import type { Doacao } from './doacao';
 
 export type RootStackParamList = {
   List: undefined;
-  Detail: { pontoId: number; ponto?: Ponto };
+  Detail: { id: string };
   Donation: { ponto?: Ponto | null; returnScreen?: keyof RootStackParamList } | undefined;
-  PointItems: { pontoId: number; pontoNome: string };
+  PointItems: { pontoId: string; pontoNome: string };
   MyDonations: undefined;
   DonationDetail: { doacao: Doacao; returnScreen?: keyof RootStackParamList };
 };

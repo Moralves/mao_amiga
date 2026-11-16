@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
-import { listarPontos } from '../services/pontosService';
+import { buscarPagina } from '../services/pontosService';
 import { PointCard } from '../components/PointCard';
 import { theme } from '../styles/theme';
 
@@ -25,7 +25,7 @@ export interface ListScreenCustomProps {
 export type ListScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'List'>> &
   ListScreenCustomProps;
 
-const FILTROS_TIPO = ['Todos', 'RECEBE', 'DISTRIBUI', 'AMBOS'];
+const TAMANHO_PAGINA = 10;
 
 export const ListScreen: React.FC<ListScreenProps> = ({
   navigation,
@@ -33,39 +33,102 @@ export const ListScreen: React.FC<ListScreenProps> = ({
   onOpenMyDonations,
 }) => {
   const [pontos, setPontos] = useState<Ponto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTipo, setSelectedTipo] = useState('Todos');
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const carregarPontos = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const response = await listarPontos({
-        tipo: selectedTipo === 'Todos' ? undefined : selectedTipo,
-      });
-      setPontos(response.content || []);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao carregar pontos';
-      setErrorMessage(
-        `Não foi possível carregar os pontos da API (${msg}). Verifique se o servidor Spring Boot está ligado.`
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTipo]);
+  const carregandoRef = useRef(false);
+  const paginasCarregadasRef = useRef<Set<number>>(new Set());
+  const requisicaoIdRef = useRef(0);
 
+  const carregarPagina = useCallback(
+    async (paginaAlvo: number, termoBusca: string, substituir: boolean) => {
+      if (!substituir) {
+        if (carregandoRef.current || paginasCarregadasRef.current.has(paginaAlvo)) {
+          return;
+        }
+      }
+
+      const reqId = ++requisicaoIdRef.current;
+      carregandoRef.current = true;
+
+      if (substituir) {
+        paginasCarregadasRef.current.clear();
+        setLoading(true);
+        setLoadingMore(false);
+        setErrorMessage(null);
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        const resposta = await buscarPagina(termoBusca, paginaAlvo, TAMANHO_PAGINA);
+        if (reqId !== requisicaoIdRef.current) {
+          return;
+        }
+
+        paginasCarregadasRef.current.add(paginaAlvo);
+        setPage(resposta.page.number);
+        setTotalPages(resposta.page.totalPages);
+
+        if (substituir) {
+          setPontos(resposta.content || []);
+        } else {
+          setPontos((anteriores) => {
+            const idsExistentes = new Set(anteriores.map((item) => item.id));
+            const novosItens = (resposta.content || []).filter(
+              (item) => !idsExistentes.has(item.id)
+            );
+            return [...anteriores, ...novosItens];
+          });
+        }
+      } catch (err) {
+        if (reqId !== requisicaoIdRef.current) {
+          return;
+        }
+        const msg = err instanceof Error ? err.message : 'Erro ao conectar com a API';
+        setErrorMessage(
+          `Não foi possível carregar os pontos de coleta (${msg}). Verifique se a API Spring Boot está ligada.`
+        );
+      } finally {
+        if (reqId === requisicaoIdRef.current) {
+          carregandoRef.current = false;
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    []
+  );
+
+  // A cada alteração no campo de busca, filtra pela API voltando sempre para a primeira página (page = 0)
   useEffect(() => {
-    carregarPontos();
-  }, [carregarPontos]);
+    carregarPagina(0, searchQuery, true);
+  }, [searchQuery, carregarPagina]);
+
+  const handleLoadMore = () => {
+    if (loading || loadingMore || errorMessage) {
+      return;
+    }
+    const proximaPagina = page + 1;
+    if (proximaPagina >= totalPages) {
+      return;
+    }
+    if (paginasCarregadasRef.current.has(proximaPagina)) {
+      return;
+    }
+    carregarPagina(proximaPagina, searchQuery, false);
+  };
 
   const handleSelectPoint = (point: Ponto) => {
     if (onSelectPoint) {
       onSelectPoint(point);
     }
     if (navigation?.navigate) {
-      navigation.navigate('Detail', { pontoId: point.id, ponto: point });
+      navigation.navigate('Detail', { id: point.id });
     }
   };
 
@@ -78,44 +141,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({
     }
   };
 
-  const filteredPoints = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return pontos.filter((point) => {
-      const matchesSearch =
-        query === '' ||
-        point.nome.toLowerCase().includes(query) ||
-        point.endereco.toLowerCase().includes(query) ||
-        point.bairro.toLowerCase().includes(query) ||
-        point.itens.toLowerCase().includes(query) ||
-        point.tipo.toLowerCase().includes(query) ||
-        (point.descricao && point.descricao.toLowerCase().includes(query));
-
-      return matchesSearch;
-    });
-  }, [pontos, searchQuery]);
-
-  const renderTipoFilter = ({ item }: { item: string }) => {
-    const isSelected = selectedTipo === item;
-    return (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setSelectedTipo(item)}
-        style={[styles.categoryPill, isSelected && styles.categoryPillSelected]}
-      >
-        <Text
-          style={[styles.categoryPillText, isSelected && styles.categoryPillTextSelected]}
-        >
-          {item}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
       <View style={styles.container}>
-        {/* App Header */}
+        {/* Cabeçalho */}
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <View style={styles.headerTitles}>
@@ -134,11 +164,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({
           </View>
         </View>
 
-        {/* Search input */}
+        {/* Campo de busca filtrando pela API */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Pesquise por nome, bairro, alimento..."
+            placeholder="Pesquise por nome ou bairro..."
             placeholderTextColor={theme.colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -156,19 +186,7 @@ export const ListScreen: React.FC<ListScreenProps> = ({
           )}
         </View>
 
-        {/* Categories/Types horizontal filter */}
-        <View style={styles.categoriesWrapper}>
-          <FlatList
-            data={FILTROS_TIPO}
-            renderItem={renderTipoFilter}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-
-        {/* Content State: Loading, Error, or List */}
+        {/* Estado: Carregando primeira página, Erro (API desligada) ou Lista com Rolagem Infinita */}
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={theme.colors.primaryDark} />
@@ -181,7 +199,7 @@ export const ListScreen: React.FC<ListScreenProps> = ({
             <Text style={styles.errorMessage}>{errorMessage}</Text>
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={carregarPontos}
+              onPress={() => carregarPagina(0, searchQuery, true)}
               activeOpacity={0.8}
             >
               <Text style={styles.retryButtonText}>Tentar novamente</Text>
@@ -189,30 +207,37 @@ export const ListScreen: React.FC<ListScreenProps> = ({
           </View>
         ) : (
           <FlatList
-            data={filteredPoints}
-            keyExtractor={(item) => String(item.id)}
+            data={pontos}
+            keyExtractor={(item) => item.id}
             style={styles.pointsList}
             renderItem={({ item }) => (
               <PointCard point={item} onPress={() => handleSelectPoint(item)} />
             )}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color={theme.colors.primaryDark} />
+                  <Text style={styles.footerLoaderText}>Carregando mais pontos...</Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🔍</Text>
                 <Text style={styles.emptyTitle}>Nenhum ponto encontrado</Text>
                 <Text style={styles.emptySubtitle}>
-                  Tente ajustar os termos de pesquisa ou selecione outro tipo de filtro.
+                  Não encontramos pontos correspondentes à sua busca.
                 </Text>
-                {(searchQuery !== '' || selectedTipo !== 'Todos') && (
+                {searchQuery !== '' && (
                   <TouchableOpacity
                     style={styles.resetButton}
-                    onPress={() => {
-                      setSearchQuery('');
-                      setSelectedTipo('Todos');
-                    }}
+                    onPress={() => setSearchQuery('')}
                   >
-                    <Text style={styles.resetButtonText}>Limpar Filtros</Text>
+                    <Text style={styles.resetButtonText}>Limpar busca</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -301,35 +326,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontWeight: 'bold',
   },
-  categoriesWrapper: {
-    width: '100%',
-    marginBottom: theme.spacing.md,
-  },
-  categoriesList: {
-    paddingHorizontal: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  categoryPill: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.cardBg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  categoryPillSelected: {
-    backgroundColor: theme.colors.primaryDark,
-    borderColor: theme.colors.primaryDark,
-  },
-  categoryPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-  categoryPillTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
   pointsList: {
     width: '100%',
   },
@@ -338,6 +334,17 @@ const styles = StyleSheet.create({
     maxWidth: theme.layout.contentMaxWidth,
     alignSelf: 'center',
     paddingBottom: theme.spacing.xl,
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  footerLoaderText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
   },
   centerContainer: {
     flex: 1,
