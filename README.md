@@ -1,113 +1,118 @@
-# Mão Amiga
+# Instituto Mão Amiga
 
-## Sobre o Projeto
-O projeto Mão Amiga é um sistema desenvolvido para gerenciar a arrecadação, o controle de estoque e a distribuição de alimentos em pontos de coleta. O objetivo principal é garantir que as doações cheguem de forma justa e organizada a quem precisa, otimizando a logística de entrada e saída de mantimentos.
+Aplicativo mobile (Expo / React Native) e API REST (Spring Boot + H2) para gerenciamento de pontos de coleta/distribuição e registro de doações em Goiânia.
 
-## Funcionalidades Principais
+## Estrutura do Repositório
 
-No aplicativo, selecione um ponto de coleta, toque em **Cadastrar doação neste ponto** e informe o tipo e a quantidade do item. Após salvar, a página **Itens cadastrados** mostra os itens daquele ponto. Para consultá-los depois de reabrir o aplicativo, acesse o mesmo ponto e toque em **Ver itens cadastrados neste ponto**. Os registros ficam no AsyncStorage do dispositivo; não são sincronizados com um servidor.
-
-Para visualizar o histórico geral de contribuições, utilize o botão **Minhas doações** disponível no topo da tela inicial. A tela lista todas as doações salvas, detalhando tipo do item, quantidade, ponto de destino e data do registro, contando com atualização dinâmica após novos cadastros e estado vazio com atalho para doação. No topo da tela de histórico, um painel de **Resumo de Doações** apresenta instantaneamente o total geral de doações e a quantidade somada de itens agrupada por tipo (exemplo: *Roupa: 15 unidades em 3 doações*). Esses totais são calculados dinamicamente a cada renderização a partir do array de doações, sem persistência separada, mantendo-se perfeitamente atualizados ao registrar, editar ou excluir doações. Os tipos aparecem ordenados decrescentemente da maior quantidade para a menor, e caso ainda não haja registros, o resumo exibe um estado adequado sem quebrar a interface. Logo abaixo do resumo, há um campo de busca que filtra as doações pelo tipo de item enquanto o usuário digita (insensível a maiúsculas/minúsculas), exibindo mensagem contextual citando o termo quando não houver correspondências e mantendo o teclado sem cobrir o campo ou a lista.
-
-Ao tocar em qualquer doação da lista, é exibida a tela de detalhes com todos os campos da doação e a data formatada de forma legível. A partir dessa tela, é possível excluir doações cadastradas por engano: o botão de exclusão solicita confirmação via `Alert.alert` (com as opções *Cancelar* e *Excluir*). A opção *Cancelar* mantém o registro intacto, enquanto a confirmação aciona a função `excluirDoacao(id)`, removendo o item do `AsyncStorage` e retornando ao histórico atualizado sem fechar o aplicativo.
-
-O arquivo `src/data/doacoesStorage.ts` concentra a leitura, gravação, atualização e exclusão. `salvarDoacao(doacao)` acrescenta um registro com `id` e `criadoEm`; `listarDoacoes()` recupera o histórico completo; `atualizarDoacao(doacao)` (ou `editarDoacao`) permite alterar registros existentes; e `excluirDoacao(id)` remove um registro específico. A página de cada ponto filtra esse histórico pelo identificador do ponto, enquanto a tela **Minhas doações** exibe a listagem completa das doações.
-
-- Arrecadação de Alimentos: Registro da entrada de mantimentos recebidos por meio de doações.
-- Controle de Estoque: Gerenciamento transparente da quantidade de alimentos disponíveis, monitorando de perto o fluxo de entradas e saídas.
-- Distribuição Organizada: Controle do processo de entrega de alimentos aos beneficiários cadastrados.
-
-## Visão de Futuro: Validação Global de Beneficiários
-Para garantir uma distribuição justa e evitar o acúmulo indevido de recursos por uma única pessoa, o sistema contará com uma validação global de controle de retiradas.
-
-A regra de negócio estabelece que, quando um usuário realizar a retirada de alimentos em um determinado ponto de coleta, essa ação será registrada globalmente no sistema. Caso esse mesmo usuário tente realizar uma nova retirada em qualquer outro ponto de coleta vinculado à rede, o sistema identificará o registro anterior e bloqueará a nova solicitação. Essa medida de segurança e controle assegura que as doações alcancem o maior número possível de famílias, mantendo a equidade do projeto.
+- **`api/`**: Projeto Spring Boot com persistência em arquivo no banco H2 (`jdbc:h2:file:./data/institutodb`).
+- **`frontend/`**: Aplicativo mobile em React Native (Expo).
 
 ---
 
-## 🚀 Como Configurar e Rodar o Projeto
+## Como Rodar a API (`api/`)
 
-Siga o passo a passo abaixo para configurar seu ambiente de desenvolvimento e executar o aplicativo em qualquer computador, especialmente no ambiente Windows.
+### Pré-requisitos
+- **Java 17+** (testado com Java 21)
 
-### 📋 Pré-requisitos
-
-Antes de começar, certifique-se de ter as seguintes ferramentas instaladas em sua máquina:
-
-1. **[Node.js](https://nodejs.org/):** Necessário para gerenciar os pacotes e rodar o servidor do projeto. Recomendamos baixar a versão **LTS (Long Term Support)**. Ao instalar no Windows, deixe marcada a opção que adiciona o Node ao "PATH".
-2. **[Git](https://git-scm.com/):** Para clonar o código do repositório para a sua máquina.
-3. *(Opcional, mas recomendado)* **[Expo Go](https://expo.dev/go):** Um aplicativo para o seu smartphone (Android ou iOS) que permite testar o app físico facilmente sem precisar instalar pesados emuladores.
-4. *(Opcional)* **Android Studio:** Caso queira rodar o aplicativo em um emulador Android direto no computador.
-
-### 💻 Passo a Passo da Instalação
-
-**1. Clone o repositório**
-Abra o terminal (Prompt de Comando, PowerShell ou terminal do VS Code) e execute o comando abaixo para baixar o projeto:
+### Executando pelo terminal
+Na raiz do projeto:
 ```bash
-git clone <URL_DO_REPOSITORIO>
+npm run api
 ```
-*(Substitua `<URL_DO_REPOSITORIO>` pelo link deste repositório).*
-
-**2. Acesse a pasta do projeto**
-No mesmo terminal, entre na pasta que acabou de ser criada:
+Ou diretamente dentro da pasta `api/`:
 ```bash
-cd mao_amiga
+cd api
+.\mvnw.cmd spring-boot:run
 ```
 
-**3. Instale as dependências do Frontend**
-Com o Node.js devidamente instalado, execute o comando a seguir na raiz do repositório (ou dentro de `frontend/`). Ele baixará todos os pacotes e bibliotecas que o aplicativo utiliza (como o Expo e o React Native):
-```bash
-npm run install:front
-# ou: cd frontend && npm install
+- **Servidor Base**: `http://localhost:8080`
+- **Swagger UI**: `http://localhost:8080/swagger-ui/index.html`
+- **Console H2**: `http://localhost:8080/h2-console`
+  - **JDBC URL**: `jdbc:h2:file:./data/institutodb`
+  - **User Name**: `sa`
+  - **Password**: *(em branco)*
+
+---
+
+## Endpoints de Pontos de Coleta (`[N2-1]`)
+
+| Método | URL Completa | Descrição | Status de Sucesso |
+| :--- | :--- | :--- | :--- |
+| `GET` | `http://localhost:8080/api/v1/pontos` | Lista todos os pontos cadastrados | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/pontos/{id}` | Busca um ponto pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
+| `POST` | `http://localhost:8080/api/v1/pontos` | Cadastra um novo ponto (campos validados com `@Valid`) | `201 Created` / `400 Bad Request` |
+| `PUT` | `http://localhost:8080/api/v1/pontos/{id}` | Atualiza os dados de um ponto existente | `200 OK` / `400` / `404` |
+| `DELETE` | `http://localhost:8080/api/v1/pontos/{id}` | Remove um ponto pelo seu `id` | `204 No Content` / `404 Not Found` |
+
+### Exemplos de Requisição e Resposta (Swagger)
+
+#### 1. `GET /api/v1/pontos` (`200 OK`)
+Retorna a lista de `PontoResponseDTO` com os pontos da carga inicial em Goiânia:
+```json
+[
+  {
+    "id": "a1b2c3d4-e5f6-4789-8012-3456789abcde",
+    "nome": "Ponto de Coleta Campinas",
+    "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
+    "bairro": "Setor Campinas",
+    "horario": "Seg a Sex, 8h às 17h",
+    "tipo": "coleta"
+  }
+]
 ```
 
-### ▶️ Como Rodar a Aplicação
-
-#### 1. Inicie a API Spring Boot (Backend)
-Em um terminal na raiz do projeto:
-```bash
-npm run back
+#### 2. `GET /api/v1/pontos/{id}` (`200 OK`)
+```json
+{
+  "id": "a1b2c3d4-e5f6-4789-8012-3456789abcde",
+  "nome": "Ponto de Coleta Campinas",
+  "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
+  "bairro": "Setor Campinas",
+  "horario": "Seg a Sex, 8h às 17h",
+  "tipo": "coleta"
+}
 ```
-*(Ou entrando na pasta `backend`: `./mvnw spring-boot:run` no Linux/macOS ou `.\mvnw.cmd spring-boot:run` no Windows)*
 
-- A API subirá na porta `8080`: `http://localhost:8080/pontos`
-- Console H2: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:institutodb`, Usuário: `sa`, Senha em branco)
-- Documentação dos endpoints:
-  - `GET /pontos` (paginado, parâmetros `page`, `size`, `sort`, `bairro`, `tipo`)
-  - `GET /pontos/{id}` (detalhe do ponto com retorno 404 se inexistente)
-
-#### 2. Inicie o aplicativo móvel (Frontend)
-Em outro terminal na raiz do projeto:
-```bash
-npm run front
-# ou: cd frontend && npm start
+#### 3. `POST /api/v1/pontos` (`201 Created`)
+Corpo enviado (`PontoRequestDTO`):
+```json
+{
+  "nome": "Ponto Solidário Setor Oeste",
+  "endereco": "Av. Assis Chateaubriand, 500 - Setor Oeste, Goiânia - GO",
+  "bairro": "Setor Oeste",
+  "horario": "Seg a Sex, 8h às 17h",
+  "tipo": "coleta"
+}
 ```
-Isso iniciará o Metro Bundler e exibirá um **QR Code** no terminal (e possivelmente abrirá uma aba no seu navegador).
 
-**2. Escolha como visualizar o app:**
+#### 4. `PUT /api/v1/pontos/{id}` (`200 OK`)
+Corpo enviado (`PontoRequestDTO`):
+```json
+{
+  "nome": "Ponto Solidário Setor Oeste",
+  "endereco": "Av. Assis Chateaubriand, 500 - Setor Oeste, Goiânia - GO",
+  "bairro": "Setor Oeste",
+  "horario": "Seg a Sáb, 8h às 18h",
+  "tipo": "distribuição"
+}
+```
 
-- 📱 **No seu Celular Físico (Recomendado):** 
-  - Instale o app **Expo Go** no seu celular.
-  - Abra o Expo Go e escaneie o QR Code exibido no terminal do computador.
-  - *Importante: O seu celular e o computador precisam estar conectados exatamente na mesma rede Wi-Fi.*
+#### 5. `DELETE /api/v1/pontos/{id}` (`204 No Content`)
+Exclui o registro e responde sem corpo (`204`).
 
-- 💻 **No Emulador Android (Computador):**
-  - Se você tiver o Android Studio configurado com um dispositivo virtual (AVD) rodando, pressione a tecla `a` no terminal onde o Expo está executando.
+#### 6. Erro de Validação — Campo Obrigatório Vazio (`400 Bad Request`)
+Enviando `POST /api/v1/pontos` ou `PUT /api/v1/pontos/{id}` com campo vazio (`"nome": ""`), o Bean Validation rejeita com status `400` sem gravar no banco.
 
-- 🌐 **No Navegador Web:**
-  - Pressione a tecla `w` no terminal para visualizar o aplicativo diretamente no navegador do seu PC.
+#### 7. Recurso Inexistente (`404 Not Found`)
+Consultando `GET /api/v1/pontos/{id}` ou `PUT /api/v1/pontos/{id}` com um UUID que não existe no banco, a API responde com status `404 Not Found`.
 
-### 🛠️ Possíveis Problemas no Windows (Troubleshooting)
+---
 
-Caso enfrente dificuldades no Windows, aqui estão as soluções mais comuns:
+## Como Rodar o Aplicativo (`frontend/`)
 
-- **Erro de Execução de Scripts (PowerShell):** 
-  Se ao rodar algum comando (`npm`, `expo`) você receber um erro vermelho dizendo que *a execução de scripts está desabilitada neste sistema*, abra o PowerShell como **Administrador**, cole o comando abaixo e pressione Enter:
-  ```powershell
-  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-  ```
-  Digite `Y` (ou `S` para Sim) quando solicitado. Feche e reabra o terminal e tente novamente.
-
-- **Comandos não reconhecidos:**
-  Se o terminal disser que `'npm' não é reconhecido como um comando interno ou externo`, significa que o Node.js não foi instalado corretamente ou as variáveis de ambiente não foram atualizadas. Reinstale o Node.js certificando-se de marcar a opção "Add to PATH" e reinicie o computador.
-
-- **App não carrega no celular via Wi-Fi:**
-  Mude as propriedades da sua rede Wi-Fi no Windows de "Pública" para "Privada" para que o firewall não bloqueie a conexão do Expo.
+```bash
+cd frontend
+npm install
+npx expo start
+```
+- Pressione `w` para abrir no navegador ou escaneie o QR Code no aplicativo **Expo Go**.
