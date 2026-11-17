@@ -162,8 +162,7 @@ export const MyDonationsScreen: React.FC<MyDonationsScreenProps> = ({
       onSelectDonation(donation);
     } else if (navigation?.navigate) {
       navigation.navigate('DonationDetail', {
-        doacao: donation,
-        returnScreen: 'MyDonations',
+        id: donation.id,
       });
     }
   };

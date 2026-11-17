@@ -86,8 +86,7 @@ export const PointItemsScreen: React.FC<PointItemsScreenProps> = ({
       onSelectDonation(donation);
     } else if (navigation?.navigate) {
       navigation.navigate('DonationDetail', {
-        doacao: donation,
-        returnScreen: 'PointItems',
+        id: donation.id,
       });
     }
   };

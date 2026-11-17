@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Doacao } from '../types/doacao';
-import { excluir } from '../services/doacoesService';
+import { ApiError } from '../services/api';
+import { buscarPorId, excluir } from '../services/doacoesService';
 import { theme } from '../styles/theme';
 
 export interface DonationDetailCustomProps {
@@ -29,9 +30,6 @@ export type DonationDetailScreenProps = Partial<
 > &
   DonationDetailCustomProps;
 
-/**
- * Converte a data ISO em formato legível brasileiro: "DD/MM/AAAA às HH:mm"
- */
 export const formatarDataLegivel = (isoString?: string): string => {
   if (!isoString) return 'Data não informada';
   try {
@@ -57,23 +55,51 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
   onBack,
   onDeleteSuccess,
 }) => {
+  const doacaoId = route?.params?.id ?? propDonation?.id;
+  const [donation, setDonation] = useState<Doacao | null>(propDonation || null);
+  const [loading, setLoading] = useState<boolean>(!!doacaoId);
+  const [notFound, setNotFound] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const raw = route?.params?.doacao ?? propDonation;
-  const donation: Doacao | undefined = raw
-    ? {
-        id: String(raw.id),
-        tipoItem: raw.tipoItem || (raw as unknown as { itemType?: string }).itemType || '',
-        quantidade: Number(
-          raw.quantidade ?? (raw as unknown as { quantity?: number }).quantity ?? 1
-        ),
-        pontoDestino:
-          raw.pontoDestino ||
-          (raw as unknown as { pointId?: string }).pointId ||
-          'Ponto de coleta',
-        criadoEm: raw.criadoEm || new Date().toISOString(),
+  const carregarDoacao = useCallback(async () => {
+    if (!doacaoId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setNotFound(false);
+    setErrorMessage(null);
+    try {
+      const dados = await buscarPorId(doacaoId);
+      setDonation(dados);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setNotFound(true);
+      } else {
+        const msg = err instanceof Error ? err.message : 'Erro ao carregar doação';
+        setErrorMessage(msg);
       }
-    : undefined;
+    } finally {
+      setLoading(false);
+    }
+  }, [doacaoId]);
+
+  useEffect(() => {
+    carregarDoacao();
+  }, [carregarDoacao]);
+
+  // Recarrega os dados ao voltar da edição (PUT) para mostrar os valores novos mantendo id e data
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      carregarDoacao();
+    });
+    return unsubscribe;
+  }, [navigation, carregarDoacao]);
 
   const handleVoltar = () => {
     if (onBack) {
@@ -83,11 +109,21 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     }
   };
 
+  const handleEditar = () => {
+    if (navigation?.navigate && donation) {
+      navigation.navigate('Donation', {
+        doacao: donation,
+        returnScreen: 'DonationDetail',
+      });
+    }
+  };
+
   const executarExclusao = async () => {
     if (!donation?.id || isDeleting) return;
 
+    setActionError(null);
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
       await excluir(donation.id);
 
       if (onDeleteSuccess) {
@@ -97,9 +133,12 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
       } else if (onBack) {
         onBack();
       }
-    } catch {
+    } catch (err) {
       setIsDeleting(false);
-      Alert.alert('Erro', 'Não foi possível excluir esta doação. Tente novamente.');
+      const msg = err instanceof Error ? err.message : 'Falha na comunicação com a API';
+      const textoErro = `Não foi possível excluir esta doação (${msg}). Verifique se a API está ligada.`;
+      setActionError(textoErro);
+      Alert.alert('Erro ao excluir', textoErro);
     }
   };
 
@@ -108,7 +147,7 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
 
     Alert.alert(
       'Excluir doação',
-      'Tem certeza de que deseja excluir esta doação do histórico? Esta ação não pode ser desfeita.',
+      'Tem certeza de que deseja excluir esta doação do histórico?',
       [
         {
           text: 'Cancelar',
@@ -124,7 +163,7 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
 
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
       const confirmou = window.confirm(
-        'Tem certeza de que deseja excluir esta doação do histórico? Esta ação não pode ser desfeita.'
+        'Tem certeza de que deseja excluir esta doação do histórico?'
       );
       if (confirmou) {
         executarExclusao();
@@ -132,7 +171,52 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     }
   };
 
-  if (!donation) {
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primaryDark} />
+          <Text style={styles.loadingText}>Carregando detalhes da doação...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <SafeAreaView style={styles.safeContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
+        <View style={styles.header}>
+          <Pressable
+            onPress={handleVoltar}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>← Voltar</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Detalhe da doação</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>Doação não encontrada</Text>
+          <Text style={styles.emptySubtitle}>
+            A doação solicitada não existe ou foi removida (doação não encontrada - 404).
+          </Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleVoltar}
+            accessibilityRole="button"
+          >
+            <Text style={styles.primaryButtonText}>Voltar ao histórico</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (errorMessage || !donation) {
     return (
       <SafeAreaView style={styles.safeContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
@@ -149,16 +233,16 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
         </View>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>⚠️</Text>
-          <Text style={styles.emptyTitle}>Doação não encontrada</Text>
+          <Text style={styles.emptyTitle}>Erro ao buscar doação</Text>
           <Text style={styles.emptySubtitle}>
-            Não foi possível carregar os dados desta doação a partir dos parâmetros informados.
+            {errorMessage || 'Não foi possível carregar os dados desta doação.'}
           </Text>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleVoltar}
+            onPress={carregarDoacao}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>Voltar ao histórico</Text>
+            <Text style={styles.primaryButtonText}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -171,7 +255,6 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
     <SafeAreaView style={styles.safeContainer} testID="donation-detail-screen">
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.cardBg} />
 
-      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={handleVoltar}
@@ -240,13 +323,27 @@ export const DonationDetailScreen: React.FC<DonationDetailScreenProps> = ({
             </View>
           </View>
 
-          {/* Delete Action Section */}
+          {!!actionError && (
+            <View style={styles.actionErrorBanner} accessibilityRole="alert">
+              <Text style={styles.actionErrorText}>{actionError}</Text>
+            </View>
+          )}
+
+          {/* Edit and Delete Actions */}
           <View style={styles.actionCard}>
             <Text style={styles.actionCardTitle}>Gerenciar Registro</Text>
             <Text style={styles.actionCardDescription}>
-              Caso esta doação tenha sido registrada por engano ou precise ser corrigida, você pode
-              excluí-la do histórico permanentemente.
+              Você pode atualizar os dados desta doação ou excluí-la permanentemente.
             </Text>
+
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={handleEditar}
+              accessibilityRole="button"
+              accessibilityLabel="Editar doação"
+            >
+              <Text style={styles.editButtonText}>Editar doação</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.deleteButton}
@@ -395,25 +492,49 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
+  actionErrorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+  },
+  actionErrorText: {
+    color: '#991B1B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   actionCard: {
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: theme.colors.border,
     padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
     ...theme.shadows.light,
   },
   actionCardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#991B1B',
-    marginBottom: 4,
+    color: theme.colors.textMain,
   },
   actionCardDescription: {
     fontSize: 13,
     color: theme.colors.textSecondary,
     lineHeight: 18,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
+  },
+  editButton: {
+    backgroundColor: theme.colors.primaryDark,
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   deleteButton: {
     backgroundColor: '#EF4444',
@@ -432,6 +553,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xxl,
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: 15,
+    color: theme.colors.textSecondary,
   },
   emptyIcon: {
     fontSize: 48,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -17,12 +18,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
+import { Doacao } from '../types/doacao';
 import { listar } from '../services/pontosService';
-import { cadastrar } from '../services/doacoesService';
+import { cadastrar, editar } from '../services/doacoesService';
 import { theme } from '../styles/theme';
 
 export interface DonationScreenCustomProps {
   point?: Ponto | null;
+  donation?: Doacao;
   onBack?: () => void;
   onSaved?: () => void;
 }
@@ -34,26 +37,38 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
   route,
   navigation,
   point: initialPoint,
+  donation: propDonation,
   onBack,
   onSaved,
 }) => {
   const pontoInicial = route?.params?.ponto ?? initialPoint ?? null;
-  const [selectedPointName, setSelectedPointName] = useState<string>(pontoInicial?.nome ?? '');
+  const doacaoEdicao = route?.params?.doacao ?? propDonation;
+  const isEditing = Boolean(doacaoEdicao?.id);
+
+  const [selectedPointName, setSelectedPointName] = useState<string>(
+    doacaoEdicao?.pontoDestino ?? pontoInicial?.nome ?? ''
+  );
   const [availablePoints, setAvailablePoints] = useState<Ponto[]>([]);
   const [loadingPoints, setLoadingPoints] = useState(false);
   const [pointsError, setPointsError] = useState<string | null>(null);
 
-  const [itemType, setItemType] = useState('');
-  const [quantity, setQuantity] = useState('');
+  const [itemType, setItemType] = useState<string>(doacaoEdicao?.tipoItem ?? '');
+  const [quantity, setQuantity] = useState<string>(
+    doacaoEdicao?.quantidade !== undefined ? String(doacaoEdicao.quantidade) : ''
+  );
   const [errors, setErrors] = useState({ itemType: '', quantity: '', point: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
-    if (pontoInicial?.nome) {
+    if (doacaoEdicao) {
+      setItemType(doacaoEdicao.tipoItem);
+      setQuantity(String(doacaoEdicao.quantidade));
+      setSelectedPointName(doacaoEdicao.pontoDestino);
+    } else if (pontoInicial?.nome) {
       setSelectedPointName(pontoInicial.nome);
     }
-  }, [pontoInicial]);
+  }, [doacaoEdicao, pontoInicial]);
 
   // Carrega os pontos da API (GET /api/v1/pontos) para escolha do destino
   const carregarPontosApi = useCallback(async () => {
@@ -115,15 +130,23 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
     setSaveError('');
     setSaving(true);
 
+    const payload = {
+      tipoItem: itemType.trim(),
+      quantidade: Number(quantity),
+      pontoDestino: selectedPointName.trim(),
+    };
+
     try {
-      await cadastrar({
-        tipoItem: itemType.trim(),
-        quantidade: Number(quantity),
-        pontoDestino: selectedPointName.trim(),
-      });
+      if (isEditing && doacaoEdicao) {
+        await editar(doacaoEdicao.id, payload);
+      } else {
+        await cadastrar(payload);
+      }
 
       if (onSaved) {
         onSaved();
+      } else if (isEditing && navigation?.goBack) {
+        navigation.goBack();
       } else if (navigation?.navigate) {
         const returnScreen = route?.params?.returnScreen;
         if (returnScreen === 'MyDonations' && navigation.goBack) {
@@ -134,9 +157,9 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Falha ao salvar na API';
-      setSaveError(
-        `Não foi possível registrar a doação (${msg}). Verifique os dados ou se a API está ligada.`
-      );
+      const textoErro = `Não foi possível salvar a doação (${msg}). Verifique os dados ou se a API está ligada.`;
+      setSaveError(textoErro);
+      Alert.alert('Erro ao salvar', textoErro);
     } finally {
       setSaving(false);
     }
@@ -154,7 +177,9 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
             <Pressable onPress={handleBack} accessibilityRole="button" style={styles.backButton}>
               <Text style={styles.backText}>← Voltar</Text>
             </Pressable>
-            <Text style={styles.headerTitle}>Nova doação</Text>
+            <Text style={styles.headerTitle}>
+              {isEditing ? 'Editar doação' : 'Nova doação'}
+            </Text>
           </View>
 
           <ScrollView
@@ -163,9 +188,13 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            <Text style={styles.title}>Registrar Doação</Text>
+            <Text style={styles.title}>
+              {isEditing ? 'Editar Doação' : 'Registrar Doação'}
+            </Text>
             <Text style={styles.subtitle}>
-              Preencha os dados abaixo para registrar a doação na API:
+              {isEditing
+                ? 'Atualize os dados da doação abaixo e toque em Salvar alterações:'
+                : 'Preencha os dados abaixo para registrar a doação na API:'}
             </Text>
 
             {/* Tipo do Item */}
@@ -284,7 +313,11 @@ export const DonationScreen: React.FC<DonationScreenProps> = ({
               accessibilityState={{ disabled: saving }}
             >
               <Text style={styles.validateButtonText}>
-                {saving ? 'Salvando...' : 'Salvar doação'}
+                {saving
+                  ? 'Salvando...'
+                  : isEditing
+                  ? 'Salvar alterações'
+                  : 'Salvar doação'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
