@@ -6,6 +6,7 @@ export type RootStackParamList = {
   List: undefined;
   Detail: { id: string };
   PointForm: { ponto?: Ponto } | undefined;
+  FavoritePoints: undefined;
   Donation:
     | {
         ponto?: Ponto | null;
@@ -21,6 +22,10 @@ export type RootStackParamList = {
 export type ListScreenProps = NativeStackScreenProps<RootStackParamList, 'List'>;
 export type DetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 export type PointFormScreenProps = NativeStackScreenProps<RootStackParamList, 'PointForm'>;
+export type FavoritePointsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'FavoritePoints'
+>;
 export type DonationScreenProps = NativeStackScreenProps<RootStackParamList, 'Donation'>;
 export type PointItemsScreenProps = NativeStackScreenProps<RootStackParamList, 'PointItems'>;
 export type MyDonationsScreenProps = NativeStackScreenProps<RootStackParamList, 'MyDonations'>;

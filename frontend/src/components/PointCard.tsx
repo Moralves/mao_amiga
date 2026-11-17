@@ -1,14 +1,21 @@
 import React from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { StyleSheet, Text, View, Pressable, TouchableOpacity } from 'react-native';
 import { Ponto } from '../types/ponto';
 import { theme } from '../styles/theme';
 
 interface PointCardProps {
   point: Ponto;
   onPress: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (point: Ponto) => void;
 }
 
-export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
+export const PointCard: React.FC<PointCardProps> = ({
+  point,
+  onPress,
+  isFavorite = false,
+  onToggleFavorite,
+}) => {
   const getTipoStyles = (tipo: string) => {
     const t = tipo.toLowerCase();
     if (t.includes('coleta')) {
@@ -42,12 +49,32 @@ export const PointCard: React.FC<PointCardProps> = ({ point, onPress }) => {
       accessibilityLabel={`Ver detalhes do ponto ${point.nome}`}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.title}>{point.nome}</Text>
-        <View style={[styles.badge, { backgroundColor: tipoStyle.bg }]}>
-          <Text style={[styles.badgeText, { color: tipoStyle.text }]}>
-            {point.tipo}
-          </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>{point.nome}</Text>
+          <View style={[styles.badge, { backgroundColor: tipoStyle.bg }]}>
+            <Text style={[styles.badgeText, { color: tipoStyle.text }]}>
+              {point.tipo}
+            </Text>
+          </View>
         </View>
+
+        {onToggleFavorite && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => onToggleFavorite(point)}
+            style={styles.favoriteButton}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFavorite
+                ? `Desmarcar ${point.nome} dos favoritos`
+                : `Favoritar ${point.nome}`
+            }
+          >
+            <Text style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
+              {isFavorite ? '♥' : '♡'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.bairroText}>📍 {point.bairro}</Text>
@@ -88,6 +115,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: theme.spacing.xs,
   },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginRight: theme.spacing.xs,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
@@ -97,7 +131,7 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.sm,
   },
   badge: {
-    flexShrink: 1,
+    flexShrink: 0,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.round,
@@ -108,6 +142,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+  favoriteButton: {
+    minWidth: 44,
+    minHeight: 44,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: theme.spacing.xs,
+    marginTop: -6,
+  },
+  favoriteIcon: {
+    fontSize: 24,
+    color: theme.colors.textSecondary,
+  },
+  favoriteIconActive: {
+    color: '#EF4444',
   },
   bairroText: {
     fontSize: 13,

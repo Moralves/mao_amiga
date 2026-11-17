@@ -1,5 +1,6 @@
 export * from './api';
 export * from './storage';
+export * from './favoritosStorage';
 export * as pontosService from './pontosService';
 export * as doacoesService from './doacoesService';
 export {

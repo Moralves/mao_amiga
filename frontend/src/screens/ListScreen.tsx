@@ -14,6 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ponto } from '../types/ponto';
 import { buscarPagina } from '../services/pontosService';
+import { listarFavoritos, alternarFavorito } from '../services/favoritosStorage';
 import { PointCard } from '../components/PointCard';
 import { theme } from '../styles/theme';
 
@@ -21,6 +22,7 @@ export interface ListScreenCustomProps {
   onSelectPoint?: (point: Ponto) => void;
   onOpenMyDonations?: () => void;
   onOpenNewPoint?: () => void;
+  onOpenFavorites?: () => void;
 }
 
 export type ListScreenProps = Partial<NativeStackScreenProps<RootStackParamList, 'List'>> &
@@ -33,8 +35,10 @@ export const ListScreen: React.FC<ListScreenProps> = ({
   onSelectPoint,
   onOpenMyDonations,
   onOpenNewPoint,
+  onOpenFavorites,
 }) => {
   const [pontos, setPontos] = useState<Ponto[]>([]);
+  const [favoritosIds, setFavoritosIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -47,6 +51,11 @@ export const ListScreen: React.FC<ListScreenProps> = ({
   const requisicaoIdRef = useRef(0);
   const searchQueryRef = useRef(searchQuery);
   searchQueryRef.current = searchQuery;
+
+  const carregarIdsFavoritos = useCallback(async () => {
+    const ids = await listarFavoritos();
+    setFavoritosIds(ids);
+  }, []);
 
   const carregarPagina = useCallback(
     async (paginaAlvo: number, termoBusca: string, substituir: boolean) => {
@@ -108,19 +117,29 @@ export const ListScreen: React.FC<ListScreenProps> = ({
     []
   );
 
+  useEffect(() => {
+    carregarIdsFavoritos();
+  }, [carregarIdsFavoritos]);
+
   // A cada alteração no campo de busca, filtra pela API voltando sempre para a primeira página (page = 0)
   useEffect(() => {
     carregarPagina(0, searchQuery, true);
   }, [searchQuery, carregarPagina]);
 
-  // Atualiza a lista ao voltar do cadastro, edição ou exclusão de ponto sem fechar o app
+  // Atualiza a lista e os favoritos ao voltar de outras telas sem fechar o app
   useEffect(() => {
     if (!navigation?.addListener) return;
     const unsubscribe = navigation.addListener('focus', () => {
+      carregarIdsFavoritos();
       carregarPagina(0, searchQueryRef.current, true);
     });
     return unsubscribe;
-  }, [navigation, carregarPagina]);
+  }, [navigation, carregarPagina, carregarIdsFavoritos]);
+
+  const handleToggleFavorite = async (point: Ponto) => {
+    const atualizados = await alternarFavorito(point.id);
+    setFavoritosIds(atualizados);
+  };
 
   const handleLoadMore = () => {
     if (loading || loadingMore || errorMessage) {
@@ -163,6 +182,15 @@ export const ListScreen: React.FC<ListScreenProps> = ({
     }
   };
 
+  const handleOpenFavorites = () => {
+    if (onOpenFavorites) {
+      onOpenFavorites();
+    }
+    if (navigation?.navigate) {
+      navigation.navigate('FavoritePoints');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
@@ -183,6 +211,16 @@ export const ListScreen: React.FC<ListScreenProps> = ({
                 accessibilityLabel="Cadastrar novo ponto"
               >
                 <Text style={styles.newPointButtonText}>+ Novo ponto</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleOpenFavorites}
+                style={styles.favoritesButton}
+                accessibilityRole="button"
+                accessibilityLabel="Meus pontos favoritos"
+              >
+                <Text style={styles.favoritesButtonText}>♥ Meus pontos</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -245,7 +283,12 @@ export const ListScreen: React.FC<ListScreenProps> = ({
             keyExtractor={(item) => item.id}
             style={styles.pointsList}
             renderItem={({ item }) => (
-              <PointCard point={item} onPress={() => handleSelectPoint(item)} />
+              <PointCard
+                point={item}
+                isFavorite={favoritosIds.includes(item.id)}
+                onToggleFavorite={handleToggleFavorite}
+                onPress={() => handleSelectPoint(item)}
+              />
             )}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -336,6 +379,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  favoritesButton: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  favoritesButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#991B1B',
   },
   myDonationsButton: {
     backgroundColor: theme.colors.primaryLight,

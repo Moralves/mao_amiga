@@ -1,122 +1,63 @@
-# Instituto Mão Amiga
+# Instituto Mão Amiga — Projeto N2
 
 Aplicativo mobile (Expo / React Native) e API REST (Spring Boot + H2) para gerenciamento de pontos de coleta/distribuição e registro de doações em Goiânia.
 
 ## Estrutura do Repositório
 
-- **`api/`**: Projeto Spring Boot com persistência em arquivo no banco H2 (`jdbc:h2:file:./data/institutodb`).
+- **`api/`**: Projeto Spring Boot com banco de dados H2 gravando em arquivo (`jdbc:h2:file:./data/institutodb`).
 - **`frontend/`**: Aplicativo mobile em React Native (Expo).
 
 ---
 
-## Como Rodar a API (`api/`)
+## Como Rodar a API e o Aplicativo
 
-### Pré-requisitos
-- **Java 17+** (testado com Java 21)
+### 1. Como Rodar a API (`api/`)
+- **Versão do Java:** Java 17 ou superior (configurado e testado com **Java 21**).
+- **Comando para iniciar a API:**
+  ```bash
+  cd api
+  .\mvnw.cmd spring-boot:run
+  ```
+  *(No Linux/macOS: `./mvnw spring-boot:run`, ou na raiz do repositório: `npm run api`).*
+- **Endereços da API:**
+  - **URL Base:** `http://localhost:8080`
+  - **Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+  - **Console H2:** `http://localhost:8080/h2-console` (`JDBC URL`: `jdbc:h2:file:./data/institutodb`, `User Name`: `sa`, `Password`: em branco).
 
-### Executando pelo terminal
-Na raiz do projeto:
-```bash
-npm run api
-```
-Ou diretamente dentro da pasta `api/`:
-```bash
-cd api
-.\mvnw.cmd spring-boot:run
-```
-
-- **Servidor Base**: `http://localhost:8080`
-- **Swagger UI**: `http://localhost:8080/swagger-ui/index.html`
-- **Console H2**: `http://localhost:8080/h2-console`
-  - **JDBC URL**: `jdbc:h2:file:./data/institutodb`
-  - **User Name**: `sa`
-  - **Password**: *(em branco)*
+### 2. Como Rodar o App (`frontend/`) e Onde Trocar o IP
+- **Comando para iniciar o app:**
+  ```bash
+  cd frontend
+  npm install
+  npx expo start
+  ```
+- **Onde trocar o IP do servidor:**
+  - Abra o arquivo **`frontend/src/services/api.ts`** e altere a constante `API_BASE_URL`:
+    ```ts
+    export const API_BASE_URL = 'http://localhost:8080';
+    ```
+  - **No Navegador Web (`w` no terminal do Expo):** mantenha `http://localhost:8080` (os testes de integração foram realizados no navegador).
+  - **No Celular Físico (Expo Go na mesma rede Wi-Fi):** substitua `localhost` pelo IP local do computador (ex.: `http://192.168.1.15:8080`).
 
 ---
 
 ## Endpoints de Pontos de Coleta (`[N2-1]` e `[N2-2]`)
 
-| Método | URL Completa | Descrição | Status de Sucesso |
+| Método | URL Completa | Descrição | Status |
 | :--- | :--- | :--- | :--- |
 | `GET` | `http://localhost:8080/api/v1/pontos` | Lista todos os pontos cadastrados | `200 OK` |
-| `GET` | `http://localhost:8080/api/v1/pontos/filtro?filtro=...&page=0&size=10` | Busca paginada de pontos por nome ou bairro | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/pontos/filtro?filtro=...&page=0&size=10` | Busca paginada por nome ou bairro | `200 OK` |
 | `GET` | `http://localhost:8080/api/v1/pontos/{id}` | Busca um ponto pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
-| `POST` | `http://localhost:8080/api/v1/pontos` | Cadastra um novo ponto (campos validados com `@Valid`) | `201 Created` / `400 Bad Request` |
+| `POST` | `http://localhost:8080/api/v1/pontos` | Cadastra um novo ponto (`@Valid`) | `201 Created` / `400 Bad Request` |
 | `PUT` | `http://localhost:8080/api/v1/pontos/{id}` | Atualiza os dados de um ponto existente | `200 OK` / `400` / `404` |
 | `DELETE` | `http://localhost:8080/api/v1/pontos/{id}` | Remove um ponto pelo seu `id` | `204 No Content` / `404 Not Found` |
 
-### Exemplos de Requisição e Resposta — CRUD (`[N2-1]`)
-
-#### 1. `GET /api/v1/pontos` (`200 OK`)
-Retorna a lista de `PontoResponseDTO` com os pontos da carga inicial em Goiânia:
-```json
-[
-  {
-    "id": "a1b2c3d4-e5f6-4789-8012-3456789abcde",
-    "nome": "Ponto de Coleta Campinas",
-    "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
-    "bairro": "Setor Campinas",
-    "horario": "Seg a Sex, 8h às 17h",
-    "tipo": "coleta"
-  }
-]
-```
-
-#### 2. `GET /api/v1/pontos/{id}` (`200 OK`)
-```json
-{
-  "id": "a1b2c3d4-e5f6-4789-8012-3456789abcde",
-  "nome": "Ponto de Coleta Campinas",
-  "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
-  "bairro": "Setor Campinas",
-  "horario": "Seg a Sex, 8h às 17h",
-  "tipo": "coleta"
-}
-```
-
-#### 3. `POST /api/v1/pontos` (`201 Created`)
-Corpo enviado (`PontoRequestDTO`):
-```json
-{
-  "nome": "Ponto Solidário Setor Oeste",
-  "endereco": "Av. Assis Chateaubriand, 500 - Setor Oeste, Goiânia - GO",
-  "bairro": "Setor Oeste",
-  "horario": "Seg a Sex, 8h às 17h",
-  "tipo": "coleta"
-}
-```
-
-#### 4. `PUT /api/v1/pontos/{id}` (`200 OK`)
-Corpo enviado (`PontoRequestDTO`):
-```json
-{
-  "nome": "Ponto Solidário Setor Oeste",
-  "endereco": "Av. Assis Chateaubriand, 500 - Setor Oeste, Goiânia - GO",
-  "bairro": "Setor Oeste",
-  "horario": "Seg a Sáb, 8h às 18h",
-  "tipo": "distribuição"
-}
-```
-
-#### 5. `DELETE /api/v1/pontos/{id}` (`204 No Content`)
-Exclui o registro e responde sem corpo (`204`).
-
-#### 6. Erro de Validação — Campo Obrigatório Vazio (`400 Bad Request`)
-Enviando `POST /api/v1/pontos` ou `PUT /api/v1/pontos/{id}` com campo vazio (`"nome": ""`), o Bean Validation rejeita com status `400` sem gravar no banco.
-
-#### 7. Recurso Inexistente (`404 Not Found`)
-Consultando `GET /api/v1/pontos/{id}` ou `PUT /api/v1/pontos/{id}` com um UUID que não existe no banco, a API responde com status `404 Not Found`.
-
----
-
-### Exemplos de Busca Paginada (`[N2-2]`)
+### Exemplos de Busca Paginada de Pontos (`[N2-2]`)
 
 #### 1. Chamada sem filtro (padrão: 10 itens ordenados por `nome`)
-**Requisição:**
 ```http
 GET http://localhost:8080/api/v1/pontos/filtro
 ```
-**Resposta (`200 OK`):**
 ```json
 {
   "content": [
@@ -126,14 +67,6 @@ GET http://localhost:8080/api/v1/pontos/filtro
       "endereco": "Av. Assis Chateaubriand, 620 - Setor Oeste, Goiânia - GO",
       "bairro": "Setor Oeste",
       "horario": "Seg a Sex, 8h às 18h",
-      "tipo": "coleta"
-    },
-    {
-      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d502",
-      "nome": "Casa da Esperança Marista",
-      "endereco": "Rua 1122, 180 - Setor Marista, Goiânia - GO",
-      "bairro": "Setor Marista",
-      "horario": "Seg a Sex, 8h30 às 17h30",
       "tipo": "coleta"
     }
   ],
@@ -146,12 +79,10 @@ GET http://localhost:8080/api/v1/pontos/filtro
 }
 ```
 
-#### 2. Chamada filtrando por bairro (insensível a maiúsculas/minúsculas)
-**Requisição:**
+#### 2. Chamada filtrando por bairro
 ```http
 GET http://localhost:8080/api/v1/pontos/filtro?filtro=bueno&page=0&size=10
 ```
-**Resposta (`200 OK`):**
 ```json
 {
   "content": [
@@ -174,11 +105,9 @@ GET http://localhost:8080/api/v1/pontos/filtro?filtro=bueno&page=0&size=10
 ```
 
 #### 3. Chamada pedindo a segunda página (`page=1`) e ordenando por bairro (`sort=bairro,asc`)
-**Requisição:**
 ```http
 GET http://localhost:8080/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc
 ```
-**Resposta (`200 OK`):**
 ```json
 {
   "content": [
@@ -204,59 +133,40 @@ GET http://localhost:8080/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc
 
 ## Endpoints de Doações (`[N2-5]`)
 
-| Método | URL Completa | Descrição | Status de Sucesso |
+| Método | URL Completa | Descrição | Status |
 | :--- | :--- | :--- | :--- |
-| `GET` | `http://localhost:8080/api/v1/doacoes/filtro?filtro=...&page=0&size=10` | Busca paginada por tipo de item (da mais nova para a mais antiga) | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/doacoes/filtro?filtro=...&page=0&size=10` | Busca paginada por tipo de item (`criadoEm,DESC`) | `200 OK` |
 | `GET` | `http://localhost:8080/api/v1/doacoes/{id}` | Busca uma doação pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
-| `POST` | `http://localhost:8080/api/v1/doacoes` | Cadastra uma doação (`criadoEm` gerado no servidor) | `201 Created` / `400 Bad Request` |
+| `POST` | `http://localhost:8080/api/v1/doacoes` | Cadastra uma doação (`criadoEm` gerado no service) | `201 Created` / `400 Bad Request` |
 | `PUT` | `http://localhost:8080/api/v1/doacoes/{id}` | Edita uma doação mantendo `id` e `criadoEm` | `200 OK` / `400` / `404` |
 | `DELETE` | `http://localhost:8080/api/v1/doacoes/{id}` | Exclui uma doação pelo seu `id` | `204 No Content` / `404 Not Found` |
 
-### Exemplos de Requisição e Resposta — Doações (`[N2-5]`)
+---
 
-#### 1. `POST /api/v1/doacoes` (`201 Created`)
-Corpo enviado (`DoacaoRequestDTO`):
-```json
-{
-  "tipoItem": "Cesta Básica",
-  "quantidade": 5,
-  "pontoDestino": "Ponto de Coleta Campinas"
-}
-```
-Resposta (`DoacaoResponseDTO`):
-```json
-{
-  "id": "f901a23b-45c6-48d9-9012-3456789abc01",
-  "tipoItem": "Cesta Básica",
-  "quantidade": 5,
-  "pontoDestino": "Ponto de Coleta Campinas",
-  "criadoEm": "2026-11-16T20:35:00"
-}
-```
+## Roteiro de Demonstração (Até 3 Minutos — `[N2-8]`)
 
-#### 2. `GET /api/v1/doacoes/filtro?filtro=cesta&page=0&size=10` (`200 OK`)
-Filtra pelo tipo de item sem diferenciar maiúsculas, ordenando da mais nova para a mais antiga (`sort=criadoEm,desc`).
-
-#### 3. `GET /api/v1/doacoes/{id}` (`200 OK` / `404 Not Found`)
-Retorna o `DoacaoResponseDTO` correspondente ou status `404` caso o `id` não exista.
-
-#### 4. `PUT /api/v1/doacoes/{id}` (`200 OK` / `400` / `404`)
-Atualiza `tipoItem`, `quantidade` e `pontoDestino`, preservando `id` e `criadoEm`.
-
-#### 5. `DELETE /api/v1/doacoes/{id}` (`204 No Content`)
-Remove a doação do banco.
-
-#### 6. Erro de Validação (`400 Bad Request`)
-Quantidade zero (`0`), negativa ou `tipoItem` vazio respondem `400 Bad Request` e não gravam no banco.
+1. **Buscar, cadastrar, editar e excluir um ponto (1 min):**
+   - Na tela inicial, rolar a lista mostrando a paginação (`onEndReached`) e digitar `"Bueno"` na busca para filtrar pela API.
+   - Tocar em **"+ Novo ponto"**, preencher nome, endereço, bairro, horário, escolher `"coleta"` nos botões de tipo e salvar (`POST`).
+   - Abrir o ponto recém-criado na lista, tocar em **"Editar ponto"**, alterar o tipo para `"distribuição"` no mesmo formulário e tocar em **"Salvar alterações"** (`PUT`), mostrando o detalhe e a lista atualizados.
+   - Abrir novamente o ponto, tocar em **"Excluir ponto"** e confirmar a exclusão (`DELETE`).
+2. **Favoritar pontos e tela "Meus pontos" (30s):**
+   - Tocar no ícone de coração (`♡` → `♥`) em dois pontos da lista.
+   - Abrir a tela **"♥ Meus pontos"** no cabeçalho (que busca cada ponto na API pelo `id` salvo no `AsyncStorage`).
+   - Desmarcar um ponto diretamente na tela **"Meus pontos"** (`♥`), mostrando que ele sai da tela na hora e persiste ao reabrir o app.
+3. **Cadastrar, editar e excluir uma doação (1 min):**
+   - Tocar em **"Minhas doações"** → **"+ Nova doação"**, preencher o tipo do item (`"Cesta Básica"`), quantidade (`5`), escolher o ponto de destino nos `TouchableOpacity` vindos da API e salvar (`POST`).
+   - Verificar a doação nova no topo do histórico, filtrar pelo tipo de item no campo de busca e tocar na doação para abrir o detalhe (buscado por `id` na API).
+   - Tocar em **"Editar doação"**, alterar a quantidade para `10` e tocar em **"Salvar alterações"** (`PUT`), confirmando que `id` e data de cadastro foram mantidos.
+   - Tocar em **"Excluir esta doação"** e confirmar (`DELETE`), voltando ao histórico atualizado.
+4. **Mostrar erros `400` e `404` na API pelo Swagger (30s):**
+   - No Swagger (`http://localhost:8080/swagger-ui/index.html`), enviar um `POST /api/v1/pontos` com `"nome": ""` ou `POST /api/v1/doacoes` com `"quantidade": 0` para demonstrar o `400 Bad Request`.
+   - Consultar `GET /api/v1/pontos/{id}` com um UUID inexistente para demonstrar o `404 Not Found`.
 
 ---
 
-## Como Rodar o Aplicativo (`frontend/`)
+## Decisão Técnica da Semana
 
-```bash
-cd frontend
-npm install
-npx expo start
-```
-- **Teste no Navegador:** Os testes de integração com a API foram realizados no navegador pressionando `w` no terminal do Expo (`http://localhost:8080` configurado em `frontend/src/services/api.ts`).
-- **Teste no Celular pela Rede Local:** Ao testar no celular físico via Expo Go, edite a constante `API_BASE_URL` em `frontend/src/services/api.ts` trocando `localhost` pelo IP local do computador na mesma rede Wi-Fi (ex.: `http://192.168.1.15:8080`).
+**Por que os favoritos ficam no `AsyncStorage` do aparelho (guardando apenas os `id`s) enquanto pontos e doações ficam no servidor?**
+- **Pontos de coleta e doações** são dados compartilhados da instituição: se um ponto mudar de horário ou uma nova doação for registrada, todos os usuários e voluntários precisam enxergar a mesma informação centralizada no banco de dados da API.
+- **Pontos favoritos**, por outro lado, são uma preferência individual de cada aparelho (quando ainda não há sistema de login por usuário). Além disso, guardar **apenas os `id`s** no `AsyncStorage` e buscar os dados atualizados na API ao abrir a tela *"Meus pontos"* evita exibir dados desatualizados caso um ponto tenha seu endereço editado e permite ignorar de forma segura (`404`) pontos que tenham sido excluídos no servidor.
