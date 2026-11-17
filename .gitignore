@@ -42,7 +42,17 @@ yarn-error.*
 /frontend/ios
 /frontend/android
 
-# Java / Maven backend
+# Java / Maven API e banco H2 em arquivo
+api/target/
+api/data/
 backend/target/
 *.class
 *.log
+*.mv.db
+*.trace.db
+
+# Documentos locais da prova e configs de IDE
+docs/
+.claude/
+AGENTS.md
+CLAUDE.md

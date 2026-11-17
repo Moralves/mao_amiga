@@ -1,4 +1,20 @@
 export * from './api';
-export * from './pontosService';
-export * from './doacoesStorage';
 export * from './storage';
+export * from './favoritosStorage';
+export * as pontosService from './pontosService';
+export * as doacoesService from './doacoesService';
+export {
+  listarPontos,
+  buscarPaginaPontos,
+  buscarPontoPorId,
+  cadastrarPonto,
+  editarPonto,
+  excluirPonto,
+} from './pontosService';
+export {
+  buscarPaginaDoacoes,
+  buscarDoacaoPorId,
+  cadastrarDoacao,
+  editarDoacao,
+  excluirDoacao,
+} from './doacoesService';

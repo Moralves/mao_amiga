@@ -4,15 +4,28 @@ import type { Doacao } from './doacao';
 
 export type RootStackParamList = {
   List: undefined;
-  Detail: { pontoId: number; ponto?: Ponto };
-  Donation: { ponto?: Ponto | null; returnScreen?: keyof RootStackParamList } | undefined;
-  PointItems: { pontoId: number; pontoNome: string };
+  Detail: { id: string };
+  PointForm: { ponto?: Ponto } | undefined;
+  FavoritePoints: undefined;
+  Donation:
+    | {
+        ponto?: Ponto | null;
+        doacao?: Doacao;
+        returnScreen?: keyof RootStackParamList;
+      }
+    | undefined;
+  PointItems: { pontoId: string; pontoNome: string };
   MyDonations: undefined;
-  DonationDetail: { doacao: Doacao; returnScreen?: keyof RootStackParamList };
+  DonationDetail: { id: string };
 };
 
 export type ListScreenProps = NativeStackScreenProps<RootStackParamList, 'List'>;
 export type DetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Detail'>;
+export type PointFormScreenProps = NativeStackScreenProps<RootStackParamList, 'PointForm'>;
+export type FavoritePointsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'FavoritePoints'
+>;
 export type DonationScreenProps = NativeStackScreenProps<RootStackParamList, 'Donation'>;
 export type PointItemsScreenProps = NativeStackScreenProps<RootStackParamList, 'PointItems'>;
 export type MyDonationsScreenProps = NativeStackScreenProps<RootStackParamList, 'MyDonations'>;

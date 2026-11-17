@@ -1,113 +1,172 @@
-# Mão Amiga
+# Instituto Mão Amiga — Projeto N2
 
-## Sobre o Projeto
-O projeto Mão Amiga é um sistema desenvolvido para gerenciar a arrecadação, o controle de estoque e a distribuição de alimentos em pontos de coleta. O objetivo principal é garantir que as doações cheguem de forma justa e organizada a quem precisa, otimizando a logística de entrada e saída de mantimentos.
+Aplicativo mobile (Expo / React Native) e API REST (Spring Boot + H2) para gerenciamento de pontos de coleta/distribuição e registro de doações em Goiânia.
 
-## Funcionalidades Principais
+## Estrutura do Repositório
 
-No aplicativo, selecione um ponto de coleta, toque em **Cadastrar doação neste ponto** e informe o tipo e a quantidade do item. Após salvar, a página **Itens cadastrados** mostra os itens daquele ponto. Para consultá-los depois de reabrir o aplicativo, acesse o mesmo ponto e toque em **Ver itens cadastrados neste ponto**. Os registros ficam no AsyncStorage do dispositivo; não são sincronizados com um servidor.
-
-Para visualizar o histórico geral de contribuições, utilize o botão **Minhas doações** disponível no topo da tela inicial. A tela lista todas as doações salvas, detalhando tipo do item, quantidade, ponto de destino e data do registro, contando com atualização dinâmica após novos cadastros e estado vazio com atalho para doação. No topo da tela de histórico, um painel de **Resumo de Doações** apresenta instantaneamente o total geral de doações e a quantidade somada de itens agrupada por tipo (exemplo: *Roupa: 15 unidades em 3 doações*). Esses totais são calculados dinamicamente a cada renderização a partir do array de doações, sem persistência separada, mantendo-se perfeitamente atualizados ao registrar, editar ou excluir doações. Os tipos aparecem ordenados decrescentemente da maior quantidade para a menor, e caso ainda não haja registros, o resumo exibe um estado adequado sem quebrar a interface. Logo abaixo do resumo, há um campo de busca que filtra as doações pelo tipo de item enquanto o usuário digita (insensível a maiúsculas/minúsculas), exibindo mensagem contextual citando o termo quando não houver correspondências e mantendo o teclado sem cobrir o campo ou a lista.
-
-Ao tocar em qualquer doação da lista, é exibida a tela de detalhes com todos os campos da doação e a data formatada de forma legível. A partir dessa tela, é possível excluir doações cadastradas por engano: o botão de exclusão solicita confirmação via `Alert.alert` (com as opções *Cancelar* e *Excluir*). A opção *Cancelar* mantém o registro intacto, enquanto a confirmação aciona a função `excluirDoacao(id)`, removendo o item do `AsyncStorage` e retornando ao histórico atualizado sem fechar o aplicativo.
-
-O arquivo `src/data/doacoesStorage.ts` concentra a leitura, gravação, atualização e exclusão. `salvarDoacao(doacao)` acrescenta um registro com `id` e `criadoEm`; `listarDoacoes()` recupera o histórico completo; `atualizarDoacao(doacao)` (ou `editarDoacao`) permite alterar registros existentes; e `excluirDoacao(id)` remove um registro específico. A página de cada ponto filtra esse histórico pelo identificador do ponto, enquanto a tela **Minhas doações** exibe a listagem completa das doações.
-
-- Arrecadação de Alimentos: Registro da entrada de mantimentos recebidos por meio de doações.
-- Controle de Estoque: Gerenciamento transparente da quantidade de alimentos disponíveis, monitorando de perto o fluxo de entradas e saídas.
-- Distribuição Organizada: Controle do processo de entrega de alimentos aos beneficiários cadastrados.
-
-## Visão de Futuro: Validação Global de Beneficiários
-Para garantir uma distribuição justa e evitar o acúmulo indevido de recursos por uma única pessoa, o sistema contará com uma validação global de controle de retiradas.
-
-A regra de negócio estabelece que, quando um usuário realizar a retirada de alimentos em um determinado ponto de coleta, essa ação será registrada globalmente no sistema. Caso esse mesmo usuário tente realizar uma nova retirada em qualquer outro ponto de coleta vinculado à rede, o sistema identificará o registro anterior e bloqueará a nova solicitação. Essa medida de segurança e controle assegura que as doações alcancem o maior número possível de famílias, mantendo a equidade do projeto.
+- **`api/`**: Projeto Spring Boot com banco de dados H2 gravando em arquivo (`jdbc:h2:file:./data/institutodb`).
+- **`frontend/`**: Aplicativo mobile em React Native (Expo).
 
 ---
 
-## 🚀 Como Configurar e Rodar o Projeto
+## Como Rodar a API e o Aplicativo
 
-Siga o passo a passo abaixo para configurar seu ambiente de desenvolvimento e executar o aplicativo em qualquer computador, especialmente no ambiente Windows.
-
-### 📋 Pré-requisitos
-
-Antes de começar, certifique-se de ter as seguintes ferramentas instaladas em sua máquina:
-
-1. **[Node.js](https://nodejs.org/):** Necessário para gerenciar os pacotes e rodar o servidor do projeto. Recomendamos baixar a versão **LTS (Long Term Support)**. Ao instalar no Windows, deixe marcada a opção que adiciona o Node ao "PATH".
-2. **[Git](https://git-scm.com/):** Para clonar o código do repositório para a sua máquina.
-3. *(Opcional, mas recomendado)* **[Expo Go](https://expo.dev/go):** Um aplicativo para o seu smartphone (Android ou iOS) que permite testar o app físico facilmente sem precisar instalar pesados emuladores.
-4. *(Opcional)* **Android Studio:** Caso queira rodar o aplicativo em um emulador Android direto no computador.
-
-### 💻 Passo a Passo da Instalação
-
-**1. Clone o repositório**
-Abra o terminal (Prompt de Comando, PowerShell ou terminal do VS Code) e execute o comando abaixo para baixar o projeto:
-```bash
-git clone <URL_DO_REPOSITORIO>
-```
-*(Substitua `<URL_DO_REPOSITORIO>` pelo link deste repositório).*
-
-**2. Acesse a pasta do projeto**
-No mesmo terminal, entre na pasta que acabou de ser criada:
-```bash
-cd mao_amiga
-```
-
-**3. Instale as dependências do Frontend**
-Com o Node.js devidamente instalado, execute o comando a seguir na raiz do repositório (ou dentro de `frontend/`). Ele baixará todos os pacotes e bibliotecas que o aplicativo utiliza (como o Expo e o React Native):
-```bash
-npm run install:front
-# ou: cd frontend && npm install
-```
-
-### ▶️ Como Rodar a Aplicação
-
-#### 1. Inicie a API Spring Boot (Backend)
-Em um terminal na raiz do projeto:
-```bash
-npm run back
-```
-*(Ou entrando na pasta `backend`: `./mvnw spring-boot:run` no Linux/macOS ou `.\mvnw.cmd spring-boot:run` no Windows)*
-
-- A API subirá na porta `8080`: `http://localhost:8080/pontos`
-- Console H2: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:institutodb`, Usuário: `sa`, Senha em branco)
-- Documentação dos endpoints:
-  - `GET /pontos` (paginado, parâmetros `page`, `size`, `sort`, `bairro`, `tipo`)
-  - `GET /pontos/{id}` (detalhe do ponto com retorno 404 se inexistente)
-
-#### 2. Inicie o aplicativo móvel (Frontend)
-Em outro terminal na raiz do projeto:
-```bash
-npm run front
-# ou: cd frontend && npm start
-```
-Isso iniciará o Metro Bundler e exibirá um **QR Code** no terminal (e possivelmente abrirá uma aba no seu navegador).
-
-**2. Escolha como visualizar o app:**
-
-- 📱 **No seu Celular Físico (Recomendado):** 
-  - Instale o app **Expo Go** no seu celular.
-  - Abra o Expo Go e escaneie o QR Code exibido no terminal do computador.
-  - *Importante: O seu celular e o computador precisam estar conectados exatamente na mesma rede Wi-Fi.*
-
-- 💻 **No Emulador Android (Computador):**
-  - Se você tiver o Android Studio configurado com um dispositivo virtual (AVD) rodando, pressione a tecla `a` no terminal onde o Expo está executando.
-
-- 🌐 **No Navegador Web:**
-  - Pressione a tecla `w` no terminal para visualizar o aplicativo diretamente no navegador do seu PC.
-
-### 🛠️ Possíveis Problemas no Windows (Troubleshooting)
-
-Caso enfrente dificuldades no Windows, aqui estão as soluções mais comuns:
-
-- **Erro de Execução de Scripts (PowerShell):** 
-  Se ao rodar algum comando (`npm`, `expo`) você receber um erro vermelho dizendo que *a execução de scripts está desabilitada neste sistema*, abra o PowerShell como **Administrador**, cole o comando abaixo e pressione Enter:
-  ```powershell
-  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+### 1. Como Rodar a API (`api/`)
+- **Versão do Java:** Java 17 ou superior (configurado e testado com **Java 21**).
+- **Comando para iniciar a API:**
+  ```bash
+  cd api
+  .\mvnw.cmd spring-boot:run
   ```
-  Digite `Y` (ou `S` para Sim) quando solicitado. Feche e reabra o terminal e tente novamente.
+  *(No Linux/macOS: `./mvnw spring-boot:run`, ou na raiz do repositório: `npm run api`).*
+- **Endereços da API:**
+  - **URL Base:** `http://localhost:8080`
+  - **Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+  - **Console H2:** `http://localhost:8080/h2-console` (`JDBC URL`: `jdbc:h2:file:./data/institutodb`, `User Name`: `sa`, `Password`: em branco).
 
-- **Comandos não reconhecidos:**
-  Se o terminal disser que `'npm' não é reconhecido como um comando interno ou externo`, significa que o Node.js não foi instalado corretamente ou as variáveis de ambiente não foram atualizadas. Reinstale o Node.js certificando-se de marcar a opção "Add to PATH" e reinicie o computador.
+### 2. Como Rodar o App (`frontend/`) e Onde Trocar o IP
+- **Comando para iniciar o app:**
+  ```bash
+  cd frontend
+  npm install
+  npx expo start
+  ```
+- **Onde trocar o IP do servidor:**
+  - Abra o arquivo **`frontend/src/services/api.ts`** e altere a constante `API_BASE_URL`:
+    ```ts
+    export const API_BASE_URL = 'http://localhost:8080';
+    ```
+  - **No Navegador Web (`w` no terminal do Expo):** mantenha `http://localhost:8080` (os testes de integração foram realizados no navegador).
+  - **No Celular Físico (Expo Go na mesma rede Wi-Fi):** substitua `localhost` pelo IP local do computador (ex.: `http://192.168.1.15:8080`).
 
-- **App não carrega no celular via Wi-Fi:**
-  Mude as propriedades da sua rede Wi-Fi no Windows de "Pública" para "Privada" para que o firewall não bloqueie a conexão do Expo.
+---
+
+## Endpoints de Pontos de Coleta (`[N2-1]` e `[N2-2]`)
+
+| Método | URL Completa | Descrição | Status |
+| :--- | :--- | :--- | :--- |
+| `GET` | `http://localhost:8080/api/v1/pontos` | Lista todos os pontos cadastrados | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/pontos/filtro?filtro=...&page=0&size=10` | Busca paginada por nome ou bairro | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/pontos/{id}` | Busca um ponto pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
+| `POST` | `http://localhost:8080/api/v1/pontos` | Cadastra um novo ponto (`@Valid`) | `201 Created` / `400 Bad Request` |
+| `PUT` | `http://localhost:8080/api/v1/pontos/{id}` | Atualiza os dados de um ponto existente | `200 OK` / `400` / `404` |
+| `DELETE` | `http://localhost:8080/api/v1/pontos/{id}` | Remove um ponto pelo seu `id` | `204 No Content` / `404 Not Found` |
+
+### Exemplos de Busca Paginada de Pontos (`[N2-2]`)
+
+#### 1. Chamada sem filtro (padrão: 10 itens ordenados por `nome`)
+```http
+GET http://localhost:8080/api/v1/pontos/filtro
+```
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d501",
+      "nome": "Base Comunitária Setor Oeste",
+      "endereco": "Av. Assis Chateaubriand, 620 - Setor Oeste, Goiânia - GO",
+      "bairro": "Setor Oeste",
+      "horario": "Seg a Sex, 8h às 18h",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 25,
+    "totalPages": 3
+  }
+}
+```
+
+#### 2. Chamada filtrando por bairro
+```http
+GET http://localhost:8080/api/v1/pontos/filtro?filtro=bueno&page=0&size=10
+```
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d503",
+      "nome": "Centro de Arrecadação Bueno",
+      "endereco": "Av. T-4, 1400 - Setor Bueno, Goiânia - GO",
+      "bairro": "Setor Bueno",
+      "horario": "Seg a Sáb, 9h às 19h",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
+
+#### 3. Chamada pedindo a segunda página (`page=1`) e ordenando por bairro (`sort=bairro,asc`)
+```http
+GET http://localhost:8080/api/v1/pontos/filtro?page=1&size=10&sort=bairro,asc
+```
+```json
+{
+  "content": [
+    {
+      "id": "e41f891a-12b0-4c9a-9f31-10a2b3c4d511",
+      "nome": "Ponto de Coleta Campinas",
+      "endereco": "Praça Joaquim Lúcio, s/n - Setor Campinas, Goiânia - GO",
+      "bairro": "Setor Campinas",
+      "horario": "Seg a Sex, 8h às 17h",
+      "tipo": "coleta"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 1,
+    "totalElements": 25,
+    "totalPages": 3
+  }
+}
+```
+
+---
+
+## Endpoints de Doações (`[N2-5]`)
+
+| Método | URL Completa | Descrição | Status |
+| :--- | :--- | :--- | :--- |
+| `GET` | `http://localhost:8080/api/v1/doacoes/filtro?filtro=...&page=0&size=10` | Busca paginada por tipo de item (`criadoEm,DESC`) | `200 OK` |
+| `GET` | `http://localhost:8080/api/v1/doacoes/{id}` | Busca uma doação pelo seu `id` (`UUID`) | `200 OK` / `404 Not Found` |
+| `POST` | `http://localhost:8080/api/v1/doacoes` | Cadastra uma doação (`criadoEm` gerado no service) | `201 Created` / `400 Bad Request` |
+| `PUT` | `http://localhost:8080/api/v1/doacoes/{id}` | Edita uma doação mantendo `id` e `criadoEm` | `200 OK` / `400` / `404` |
+| `DELETE` | `http://localhost:8080/api/v1/doacoes/{id}` | Exclui uma doação pelo seu `id` | `204 No Content` / `404 Not Found` |
+
+---
+
+## Roteiro de Demonstração (Até 3 Minutos — `[N2-8]`)
+
+1. **Buscar, cadastrar, editar e excluir um ponto (1 min):**
+   - Na tela inicial, rolar a lista mostrando a paginação (`onEndReached`) e digitar `"Bueno"` na busca para filtrar pela API.
+   - Tocar em **"+ Novo ponto"**, preencher nome, endereço, bairro, horário, escolher `"coleta"` nos botões de tipo e salvar (`POST`).
+   - Abrir o ponto recém-criado na lista, tocar em **"Editar ponto"**, alterar o tipo para `"distribuição"` no mesmo formulário e tocar em **"Salvar alterações"** (`PUT`), mostrando o detalhe e a lista atualizados.
+   - Abrir novamente o ponto, tocar em **"Excluir ponto"** e confirmar a exclusão (`DELETE`).
+2. **Favoritar pontos e tela "Meus pontos" (30s):**
+   - Tocar no ícone de coração (`♡` → `♥`) em dois pontos da lista.
+   - Abrir a tela **"♥ Meus pontos"** no cabeçalho (que busca cada ponto na API pelo `id` salvo no `AsyncStorage`).
+   - Desmarcar um ponto diretamente na tela **"Meus pontos"** (`♥`), mostrando que ele sai da tela na hora e persiste ao reabrir o app.
+3. **Cadastrar, editar e excluir uma doação (1 min):**
+   - Tocar em **"Minhas doações"** → **"+ Nova doação"**, preencher o tipo do item (`"Cesta Básica"`), quantidade (`5`), escolher o ponto de destino nos `TouchableOpacity` vindos da API e salvar (`POST`).
+   - Verificar a doação nova no topo do histórico, filtrar pelo tipo de item no campo de busca e tocar na doação para abrir o detalhe (buscado por `id` na API).
+   - Tocar em **"Editar doação"**, alterar a quantidade para `10` e tocar em **"Salvar alterações"** (`PUT`), confirmando que `id` e data de cadastro foram mantidos.
+   - Tocar em **"Excluir esta doação"** e confirmar (`DELETE`), voltando ao histórico atualizado.
+4. **Mostrar erros `400` e `404` na API pelo Swagger (30s):**
+   - No Swagger (`http://localhost:8080/swagger-ui/index.html`), enviar um `POST /api/v1/pontos` com `"nome": ""` ou `POST /api/v1/doacoes` com `"quantidade": 0` para demonstrar o `400 Bad Request`.
+   - Consultar `GET /api/v1/pontos/{id}` com um UUID inexistente para demonstrar o `404 Not Found`.
+
+---
+
+## Decisão Técnica da Semana
+
+**Por que os favoritos ficam no `AsyncStorage` do aparelho (guardando apenas os `id`s) enquanto pontos e doações ficam no servidor?**
+- **Pontos de coleta e doações** são dados compartilhados da instituição: se um ponto mudar de horário ou uma nova doação for registrada, todos os usuários e voluntários precisam enxergar a mesma informação centralizada no banco de dados da API.
+- **Pontos favoritos**, por outro lado, são uma preferência individual de cada aparelho (quando ainda não há sistema de login por usuário). Além disso, guardar **apenas os `id`s** no `AsyncStorage` e buscar os dados atualizados na API ao abrir a tela *"Meus pontos"* evita exibir dados desatualizados caso um ponto tenha seu endereço editado e permite ignorar de forma segura (`404`) pontos que tenham sido excluídos no servidor.

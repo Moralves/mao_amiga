@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootStackParamList } from './src/types/navigation';
 import { ListScreen } from './src/screens/ListScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
+import { PointFormScreen } from './src/screens/PointFormScreen';
+import { FavoritePointsScreen } from './src/screens/FavoritePointsScreen';
 import { DonationScreen } from './src/screens/DonationScreen';
 import { PointItemsScreen } from './src/screens/PointItemsScreen';
 import { MyDonationsScreen } from './src/screens/MyDonationsScreen';
@@ -25,6 +27,8 @@ export default function App() {
         >
           <Stack.Screen name="List" component={ListScreen} />
           <Stack.Screen name="Detail" component={DetailScreen} />
+          <Stack.Screen name="PointForm" component={PointFormScreen} />
+          <Stack.Screen name="FavoritePoints" component={FavoritePointsScreen} />
           <Stack.Screen name="Donation" component={DonationScreen} />
           <Stack.Screen name="PointItems" component={PointItemsScreen} />
           <Stack.Screen name="MyDonations" component={MyDonationsScreen} />
